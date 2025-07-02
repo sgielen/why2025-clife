@@ -58,6 +58,14 @@ int app_main(void) {
     xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
+    printf("Suspending worker task A\n");
+    vTaskSuspend(elf_a);
+
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    printf("Restarting worker task A\n");
+    vTaskResume(elf_a);
+
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Killing worker task A\n");
     vTaskDelete(elf_a);
 
