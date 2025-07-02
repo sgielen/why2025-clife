@@ -54,8 +54,8 @@ int app_main(void) {
     TaskHandle_t elf_a, elf_b;
     printf("Hello ESP32P4 firmware\n");
 
-    xTaskCreate(run_elf, "Task1", 2048, test_elf_a_start, 5, &elf_a); 
-    xTaskCreate(run_elf, "Task2", 2048, test_elf_b_start, 5, &elf_b); 
+    xTaskCreate(run_elf, "Task1", 4096, test_elf_a_start, 5, &elf_a); 
+    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Killing worker task A\n");
