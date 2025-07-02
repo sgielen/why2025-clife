@@ -1,0 +1,28 @@
+dependencies:
+  elf_loader:
+    dependencies: []
+    source:
+      path: /home/hp/Projects/why2025/why2025_firmware/components/elf_loader
+      type: local
+    version: 1.0.0
+  espressif/cmake_utilities:
+    component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.5.3
+  idf:
+    source:
+      type: idf
+    version: 6.0.0
+direct_dependencies:
+- elf_loader
+- espressif/cmake_utilities
+- idf
+manifest_hash: 755d3fca15f543cfa2a8e646b3da80a80e298320a435a2bef34a740af06ac11c
+target: esp32p4
+version: 2.0.0
