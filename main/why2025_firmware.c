@@ -17,7 +17,6 @@ extern const uint8_t test_elf_b_start[] asm("_binary_test_basic_b_elf_start");
 extern const uint8_t test_elf_b_end[] asm("_binary_test_basic_b_elf_end");
 
 void *why_malloc(size_t size) {
-    printf("WHY\n");
     TaskHandle_t h = xTaskGetCurrentTaskHandle();
     ESP_LOGI("why_malloc", "Calling malloc from task %p", h);
     return malloc(size);
