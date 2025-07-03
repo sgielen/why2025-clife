@@ -150,9 +150,11 @@ static const struct esp_elfsym g_esp_espidf_elfsyms[] = {
 };
 
 extern void *why_malloc(size_t size);
+extern ssize_t *why_write(int fd, const void *buf, size_t count);
 
 static const struct esp_elfsym g_why2025_libc_elfsyms[] = {
     ESP_ELFSYM_EXPORT_RENAME(malloc, why_malloc),
+    ESP_ELFSYM_EXPORT_RENAME(write, why_write),
     ESP_ELFSYM_END
 };
 
