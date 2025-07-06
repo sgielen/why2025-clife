@@ -25,11 +25,11 @@ idf_component_register( SRCS
   #feof.c
   #ferror.c
   fflush.c
-  #fgetc.c
-  #fgets.c
+  fgetc.c
+  fgets.c
   #fgetwc.c
   #fgetws.c
-  #fileno.c
+  fileno.c
   #filestrget.c
   #filestrputalloc.c
   #filestrput.c
@@ -38,8 +38,8 @@ idf_component_register( SRCS
   #fmemopen.c
   fopen.c
   fprintf.c
-  #fputc.c
-  #fputs.c
+  fputc.c
+  fputs.c
   #fputwc.c
   #fputws.c
   #fread.c

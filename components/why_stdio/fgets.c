@@ -32,7 +32,7 @@
 #include "stdio_private.h"
 
 char *
-fgets(char *str, int size, FILE *stream)
+why_fgets(char *str, int size, FILE *stream)
 {
 	char *cp;
 	int c;

@@ -35,7 +35,7 @@
 #undef putc_unlocked
 
 int
-__STDIO_UNLOCKED(putc)(int c, FILE *stream)
+__STDIO_UNLOCKED(why_putc)(int c, FILE *stream)
 {
 	if ((stream->flags & __SWR) == 0)
 		return EOF;
@@ -50,24 +50,24 @@ __STDIO_UNLOCKED(putc)(int c, FILE *stream)
 
 #ifdef __STDIO_LOCKING
 int
-putc(int c, FILE *stream)
+_why_putc(int c, FILE *stream)
 {
     int ret;
     __flockfile(stream);
-    ret = putc_unlocked(c, stream);
+    ret = why_putc_unlocked(c, stream);
     __funlockfile(stream);
     return ret;
 }
 #else
 #ifdef __strong_reference
-__strong_reference(putc, putc_unlocked);
+__strong_reference(why_putc, why_putc_unlocked);
 #else
-int putc_unlocked(int c, FILE *stream) { return putc(c, stream); }
+int why_putc_unlocked(int c, FILE *stream) { return why_putc(c, stream); }
 #endif
 #endif
 
 #ifdef __strong_reference
-__strong_reference(putc, fputc);
+__strong_reference(why_putc, why_fputc);
 #else
-int fputc(int c, FILE *stream) { return putc(c, stream); }
+int why_fputc(int c, FILE *stream) { return why_putc(c, stream); }
 #endif

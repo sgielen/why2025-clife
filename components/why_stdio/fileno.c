@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 int
-fileno(FILE *stream)
+why_fileno(FILE *stream)
 {
         __flockfile(stream);
         if (stream->flags & __SBUF) {

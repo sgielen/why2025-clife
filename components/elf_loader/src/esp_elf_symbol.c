@@ -36,6 +36,7 @@ static const struct esp_elfsym g_esp_libc_elfsyms[] = {
     ESP_ELFSYM_EXPORT(strerror),
     ESP_ELFSYM_EXPORT(memset),
     ESP_ELFSYM_EXPORT(memcpy),
+    ESP_ELFSYM_EXPORT(memmove),
     ESP_ELFSYM_EXPORT(strlen),
     ESP_ELFSYM_EXPORT(strtod),
     ESP_ELFSYM_EXPORT(strrchr),
@@ -44,6 +45,13 @@ static const struct esp_elfsym g_esp_libc_elfsyms[] = {
     ESP_ELFSYM_EXPORT(strtol),
     ESP_ELFSYM_EXPORT(strcspn),
     ESP_ELFSYM_EXPORT(strncat),
+    ESP_ELFSYM_EXPORT(strcasecmp),
+    ESP_ELFSYM_EXPORT(strcpy),
+    ESP_ELFSYM_EXPORT(strncpy),
+    ESP_ELFSYM_EXPORT(strtok),
+    ESP_ELFSYM_EXPORT(sscanf),
+    //ESP_ELFSYM_EXPORT(strdupa),
+    //ESP_ELFSYM_EXPORT(strndupa),
 
     /* unistd.h */
 
@@ -59,10 +67,22 @@ static const struct esp_elfsym g_esp_libc_elfsyms[] = {
     //ESP_ELFSYM_EXPORT(realloc),
     //ESP_ELFSYM_EXPORT(free),
 
+    /* stdio.h */
+
+    ESP_ELFSYM_EXPORT(snprintf),
+    ESP_ELFSYM_EXPORT(dprintf),
+    ESP_ELFSYM_EXPORT(sprintf),
+    ESP_ELFSYM_EXPORT(snprintf),
+    ESP_ELFSYM_EXPORT(vprintf),
+    ESP_ELFSYM_EXPORT(vdprintf),
+    ESP_ELFSYM_EXPORT(vsprintf),
+    ESP_ELFSYM_EXPORT(vsnprintf),
+
     /* time.h */
 
     ESP_ELFSYM_EXPORT(clock_gettime),
     ESP_ELFSYM_EXPORT(strftime),
+    ESP_ELFSYM_EXPORT(gettimeofday),
 
     /* pthread.h */
 
@@ -163,6 +183,24 @@ extern int why_fflush(FILE *stream);
 extern FILE *why_fdopen(int, const char *);
 extern int why_fprintf(FILE *__stream, const char *__fmt, ...);
 
+extern int why_fgetc(FILE *stream);
+extern char *why_fgets(char *str, int size, FILE *stream);
+
+extern char *why_strdup(const char *s);
+extern char *why_strndup(const char *s, size_t n);
+
+extern int why_isatty(int fd);
+extern char *why_getenv(const char *name);
+
+extern int why_atexit(void (*function)(void));
+
+extern int why_tcgetattr(int fd, void *termios_p);
+extern int why_tcsetattr(int fd, int optional_actions, const void *termios_p);
+
+extern int why_fputs(const char *str, FILE *stream);
+extern int why_fputc(int c, FILE *stream);
+extern int why_fileno(FILE *stream);
+
 static const struct esp_elfsym g_why2025_libc_elfsyms[] = {
     ESP_ELFSYM_EXPORT_WHY(malloc),
     ESP_ELFSYM_EXPORT_WHY(free),
@@ -183,6 +221,23 @@ static const struct esp_elfsym g_why2025_libc_elfsyms[] = {
     ESP_ELFSYM_EXPORT_WHY(fclose),
     ESP_ELFSYM_EXPORT_WHY(fdopen),
     ESP_ELFSYM_EXPORT_WHY(fprintf),
+    ESP_ELFSYM_EXPORT_WHY(fgetc),
+    ESP_ELFSYM_EXPORT_WHY(fgets),
+    
+    ESP_ELFSYM_EXPORT_WHY(strdup),
+    ESP_ELFSYM_EXPORT_WHY(strndup),
+
+    ESP_ELFSYM_EXPORT_WHY(isatty),
+    ESP_ELFSYM_EXPORT_WHY(getenv),
+    ESP_ELFSYM_EXPORT_WHY(atexit),
+
+    ESP_ELFSYM_EXPORT_WHY(tcgetattr),
+    ESP_ELFSYM_EXPORT_WHY(tcsetattr),
+
+    ESP_ELFSYM_EXPORT_WHY(fputs),
+    ESP_ELFSYM_EXPORT_WHY(fputc),
+    ESP_ELFSYM_EXPORT_WHY(fileno),
+
     ESP_ELFSYM_END
 };
 

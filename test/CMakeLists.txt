@@ -29,6 +29,7 @@ function(build_test_elf name source)
             -fvisibility=hidden
 	    -Wl,--gc-sections
 	    -e main
+	    -I${CMAKE_CURRENT_SOURCE_DIR}
             -o ${TEST_ELF_DIR}/${name}.elf
             ${CMAKE_CURRENT_SOURCE_DIR}/${source}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
@@ -41,3 +42,4 @@ endfunction()
 
 build_test_elf(test_basic_a test_basic_a.c)
 build_test_elf(test_basic_b test_basic_b.c)
+build_test_elf(test_shell shell.c)

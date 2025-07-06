@@ -35,7 +35,7 @@
 #undef getc_unlocked
 
 int
-__STDIO_UNLOCKED(getc)(FILE *stream)
+__STDIO_UNLOCKED(why_getc)(FILE *stream)
 {
 	int rv;
 	__ungetc_t unget;
@@ -60,24 +60,24 @@ __STDIO_UNLOCKED(getc)(FILE *stream)
 
 #ifdef __STDIO_LOCKING
 int
-getc(FILE *stream)
+why_getc(FILE *stream)
 {
     int ret;
     __flockfile(stream);
-    ret = getc_unlocked(stream);
+    ret = why_getc_unlocked(stream);
     __funlockfile(stream);
     return ret;
 }
 #else
 #ifdef __strong_reference
-__strong_reference(getc, getc_unlocked);
+__strong_reference(why_getc, why_getc_unlocked);
 #else
-int getc_unlocked(FILE *stream) { return getc(stream); }
+int why_getc_unlocked(FILE *stream) { return why_getc(stream); }
 #endif
 #endif
 
 #ifdef __strong_reference
-__strong_reference(getc, fgetc);
+__strong_reference(why_getc, why_fgetc);
 #else
-int fgetc(FILE *stream) { return getc(stream); }
+int why_fgetc(FILE *stream) { return why_getc(stream); }
 #endif

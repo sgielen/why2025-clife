@@ -8,6 +8,7 @@
 
 #include "esp_log.h"
 #include "esp_elf.h"
+#include "rom/uart.h"
 #include "khash.h"
 
 #define MAXFD 128
@@ -18,6 +19,8 @@ extern const uint8_t test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
 extern const uint8_t test_elf_a_end[] asm("_binary_test_basic_a_elf_end");
 extern const uint8_t test_elf_b_start[] asm("_binary_test_basic_b_elf_start");
 extern const uint8_t test_elf_b_end[] asm("_binary_test_basic_b_elf_end");
+extern const uint8_t test_elf_shell_start[] asm("_binary_test_shell_elf_start");
+extern const uint8_t test_elf_shell_end[] asm("_binary_test_shell_elf_end");
 
 KHASH_MAP_INIT_INT64(ptable, void*);
 khash_t(ptable) *process_table;
@@ -38,6 +41,7 @@ typedef struct {
     size_t max_files;
     size_t current_files;
     file_handle_t file_handles[MAXFD];
+    char *term;
 } task_info_t;
 
 task_info_t *get_task_info() {
@@ -60,17 +64,62 @@ int *why_errno() {
     return &task_info->_errno;
 }
 
+int why_isatty(int fd) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_isatty", "Calling isatty from task %p", task_info->handle);
+    return 1;
+}
+
+char *why_getenv(const char *name) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGW("why_getenv", "Calling getenv from task %p variable %s", task_info->handle, name);
+
+    if (strcmp(name, "TERM") == 0 ) {
+        return "line";
+    }
+
+    return NULL;
+}
+
+int why_atexit(void (*function)(void)) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_atexit", "Calling atexit from task %p", task_info->handle);
+
+    return 0;
+}
+
 void *why_malloc(size_t size) {
     task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_malloc", "Calling malloc from task %p", task_info->handle);
+    ESP_LOGI("why_malloc", "Calling malloc from task %p with size %zi", task_info->handle, size);
 
-    return malloc(size);
+    return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+}
+
+int why_tcgetattr(int fd, struct termios *termios_p) {
+    return 0;
+}
+
+int why_tcsetattr(int fd, int optional_actions, const struct termios *termios_p) {
+    return 0;
+}
+
+char *why_strdup(const char *s) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_strdup", "Calling strdup from task %p", task_info->handle);
+
+    return strdup(s);
+}
+
+char *why_strndup(const char *s, size_t n) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_strndup", "Calling strndup from task %p", task_info->handle);
+    return strndup(s, n);
 }
 
 void why_free(void *_Nullable ptr) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("why_free", "Calling free from task %p", task_info->handle);
-    free(ptr);
+    heap_caps_free(ptr);
 }
 
 void *why_calloc(size_t nmemb, size_t size) {
@@ -107,7 +156,18 @@ ssize_t why_write(int fd, const void *buf, size_t count) {
 
 ssize_t why_read(int fd, void *buf, size_t count) {
     task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_read", "Calling read from task %p", task_info->handle);
+    ESP_LOGI("why_read", "Calling read from task %p fd = %i count = %zi", task_info->handle, fd, count);
+
+    if (task_info->file_handles[fd].is_stdin == true) {
+        uint8_t c;
+        while (1) {
+            ETS_STATUS s = uart_rx_one_char(&c);
+            if (s == ETS_OK) break;
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+        }
+        ((char*)buf)[0] = c;
+	    return 1;
+    }
 
     return 0;
 }
@@ -183,6 +243,7 @@ void run_elf(void *buffer) {
     task_info_t task_info;
     memset(&task_info, 0, sizeof(task_info));
 
+    task_info.term = strdup("dumb");
     task_info.current_files = 3;
     task_info.handle = h;
     task_info.file_handles[0].is_open = true;
@@ -227,9 +288,13 @@ int app_main(void) {
     TaskHandle_t elf_a, elf_b;
     printf("Hello ESP32P4 firmware\n");
 
-    xTaskCreate(run_elf, "Task1", 4096, test_elf_a_start, 5, &elf_a); 
+    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a); 
 //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 
+
+    while(1) {
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    };
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Suspending worker task A\n");
     vTaskSuspend(elf_a);

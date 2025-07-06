@@ -32,7 +32,7 @@
 #include "stdio_private.h"
 
 int
-fputs(const char *str, FILE *stream)
+why_fputs(const char *str, FILE *stream)
 {
         int (*put)(char, struct __file *);
 	char c;

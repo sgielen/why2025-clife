@@ -32,7 +32,7 @@
 #include "stdio_private.h"
 
 int
-snprintf(char *s, size_t n, const char *fmt, ...)
+why_snprintf(char *s, size_t n, const char *fmt, ...)
 {
 	va_list ap;
 	int i;
