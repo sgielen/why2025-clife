@@ -54,15 +54,30 @@ uintptr_t elf_find_sym(const char *sym_name) {{
 }}
 """
 
+symbols = []
+seen_symbols = []
+def add_sym(sym, wrap):
+    if sym in seen_symbols:
+        print(f"Duplicate symbol {sym} exiting")
+        exit(1)
+
+    seen_symbols.append(sym)
+
+    if wrap:
+        symbols.append(f'{{"{sym}", &why_{sym}}}')
+    else:
+        symbols.append(f'{{"{sym}", &{sym}}}')
+
 if __name__ == '__main__':
     if len(sys.argv) != 3:
         print(f"Usage: {argv[0]} symbol_file.yml output_source.c")
         exit(1)
 
+    seen_symbols = []
+
     input_symbols = {}
     include = []
     symbol_definitions = []
-    symbols = []
     num_symbols = 0
 
     with open(sys.argv[1], 'r') as file:
@@ -71,13 +86,13 @@ if __name__ == '__main__':
     if input_symbols['simple_function']:
         num_symbols += len(input_symbols['simple_function'])
         for sym in input_symbols['simple_function']:
-            symbols.append(f'{{"{sym}", &{sym}}}')
+            add_sym(sym, False)
 
     if input_symbols['simple_function_extern']:
         num_symbols += len(input_symbols['simple_function_extern'])
         for sym in input_symbols['simple_function_extern']:
             symbol_definitions.append(f"extern void {sym}();")
-            symbols.append(f'{{"{sym}", &{sym}}}')
+            add_sym(sym, False)
 
     if input_symbols['include']:
         for file in input_symbols['include']:
@@ -87,19 +102,19 @@ if __name__ == '__main__':
         num_symbols += len(input_symbols['simple_object'])
         for sym in input_symbols['simple_object']:
             symbol_definitions.append(f"extern int {sym};")
-            symbols.append(f'{{"{sym}", &{sym}}}')
+            add_sym(sym, False)
 
     if input_symbols['wrapped_function']:
         num_symbols += len(input_symbols['wrapped_function'])
         for sym in input_symbols['wrapped_function']:
             symbol_definitions.append(f"extern void why_{sym}();")
-            symbols.append(f'{{"{sym}", &why_{sym}}}')
+            add_sym(sym, True)
 
     if input_symbols['wrapped_object']:
         num_symbols += len(input_symbols['wrapped_object'])
         for sym in input_symbols['wrapped_object']:
             symbol_definitions.append(f"extern int why_{sym};")
-            symbols.append(f'{{"{sym}", &why_{sym}}}')
+            add_sym(sym, True)
 
     symbols.sort()
     with open(sys.argv[2], 'w') as file:

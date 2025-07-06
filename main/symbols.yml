@@ -1,6 +1,18 @@
 ---
 include:
+  - sdkconfig.h
+  - stddef.h
+  - stdio.h
+  - stdlib.h
+  - string.h
+  - sys/time.h
+  - sys/times.h
+  - sys/types.h
+  - time.h
+  - unistd.h
   - ctype.h
+  - fenv.h
+  - float.h
   - fnmatch.h
   - getopt.h
   - ieeefp.h
@@ -11,18 +23,12 @@ include:
   - regex.h
   - search.h
   - setjmp.h
-  - stddef.h
-  - stdio.h
-  - stdlib.h
-  - string.h
-  - sys/time.h
-  - sys/times.h
-  - time.h
-  - unistd.h
   - wchar.h
   - wctype.h
+  - complex.h
 
 simple_function:
+# libc.a
   - _ctype_
   - a64l
   - abort
@@ -66,9 +72,7 @@ simple_function:
   - clearerr
   - clearerr_unlocked
   - clock
-  - close
-  - copysign
-  - copysignf
+#  - close
 #  - creat
   - ctime
   - ctime_r
@@ -129,8 +133,6 @@ simple_function:
 #  - fgetws_unlocked
 #  - fileno
 #  - fileno_unlocked
-  - finite
-  - finitef
 #  - fiprintf
 #  - fiscanf
   - fls
@@ -162,9 +164,6 @@ simple_function:
 #  - free
 #  - freelocale
 #  - freopen
-  - frexp
-  - frexpf
-  - frexpl
 #  - fscanf
 #  - fseek
 #  - fseeko
@@ -230,12 +229,8 @@ simple_function:
   - isdigit_l
   - isgraph
   - isgraph_l
-  - isinf
-  - isinff
   - islower
   - islower_l
-  - isnan
-  - isnanf
   - isprint
   - isprint_l
   - ispunct
@@ -278,8 +273,6 @@ simple_function:
   - l64a
   - labs
   - lcong48
-  - ldexp
-  - ldexpf
   - ldiv
   - link
   - llabs
@@ -372,8 +365,6 @@ simple_function:
   - rindex
   - rpmatch
 #  - sbrk
-  - scalbn
-  - scalbnf
 #  - scanf
   - seed48
   - setbuf
@@ -596,6 +587,287 @@ simple_function:
 #  - wprintf
 #  - write
 #  - wscanf
+
+# libm.a
+  - acos
+  - acosf
+  - acosh
+  - acoshf
+  - acoshl
+  - acosl
+  - asin
+  - asinf
+  - asinh
+  - asinhf
+  - asinhl
+  - asinl
+  - atan
+  - atan2
+  - atan2f
+  - atan2l
+  - atanf
+  - atanh
+  - atanhf
+  - atanhl
+  - atanl
+  - cabs
+  - cabsf
+  - cabsl
+  - cacos
+  - cacosf
+  - cacosh
+  - cacoshf
+  - cacoshl
+  - cacosl
+  - carg
+  - cargf
+  - cargl
+  - casin
+  - casinf
+  - casinh
+  - casinhf
+  - casinhl
+  - casinl
+  - catan
+  - catanf
+  - catanh
+  - catanhf
+  - catanhl
+  - catanl
+  - cbrt
+  - cbrtf
+  - cbrtl
+  - ccos
+  - ccosf
+  - ccosh
+  - ccoshf
+  - ccoshl
+  - ccosl
+  - ceil
+  - ceilf
+  - ceill
+  - cexp
+  - cexpf
+  - cexpl
+  - cimag
+  - cimagf
+  - cimagl
+  - clog
+  - clog10
+  - clog10f
+  - clogf
+  - clogl
+  - conj
+  - conjf
+  - conjl
+  - copysign
+  - copysignf
+  - copysignl
+  - cos
+  - cosf
+  - cosh
+  - coshf
+  - coshl
+  - cosl
+  - cpow
+  - cpowf
+  - cpowl
+  - cproj
+  - cprojf
+  - cprojl
+  - creal
+  - crealf
+  - creall
+  - csin
+  - csinf
+  - csinh
+  - csinhf
+  - csinhl
+  - csinl
+  - csqrt
+  - csqrtf
+  - csqrtl
+  - ctan
+  - ctanf
+  - ctanh
+  - ctanhf
+  - ctanhl
+  - ctanl
+  - drem
+  - dremf
+  - erf
+  - erfc
+  - erfcf
+  - erfcl
+  - erff
+  - erfl
+  - exp
+  - exp10
+  - exp10f
+  - exp2
+  - exp2f
+  - exp2l
+  - expf
+  - expl
+  - expm1
+  - expm1f
+  - expm1l
+  - fabs
+  - fabsf
+  - fabsl
+  - fdim
+  - fdimf
+  - fdiml
+  - feclearexcept
+  - fegetenv
+  - fegetexceptflag
+  - fegetround
+  - feholdexcept
+  - feraiseexcept
+  - fesetenv
+  - fesetexceptflag
+  - fesetround
+  - fetestexcept
+  - feupdateenv
+  - finite
+  - finitef
+  - finitel
+  - floor
+  - floorf
+  - floorl
+  - fma
+  - fmaf
+  - fmal
+  - fmax
+  - fmaxf
+  - fmaxl
+  - fmin
+  - fminf
+  - fminl
+  - fmod
+  - fmodf
+  - fmodl
+  - frexp
+  - frexpf
+  - frexpl
+  - gamma
+  - gammaf
+  - gammaf_r
+  - gamma_r
+  - hypot
+  - hypotf
+  - hypotl
+  - ilogb
+  - ilogbf
+  - ilogbl
+  - infinity
+  - infinityf
+  - isinf
+  - isinff
+  - isnan
+  - isnanf
+  - j0
+  - j0f
+  - j1
+  - j1f
+  - jn
+  - jnf
+  - ldexp
+  - ldexpf
+  - ldexpl
+  - lgamma
+  - lgammaf
+  - lgammaf_r
+  - lgammal
+  - lgamma_r
+  - llrint
+  - llrintf
+  - llrintl
+  - llround
+  - llroundf
+  - llroundl
+  - log
+  - log10
+  - log10f
+  - log10l
+  - log1p
+  - log1pf
+  - log1pl
+  - log2
+  - log2f
+  - log2l
+  - logb
+  - logbf
+  - logbl
+  - logf
+  - logl
+  - lrint
+  - lrintf
+  - lrintl
+  - lround
+  - lroundf
+  - lroundl
+  - nearbyint
+  - nearbyintf
+  - nearbyintl
+  - nextafter
+  - nextafterf
+  - nextafterl
+  - nexttoward
+  - nexttowardf
+  - nexttowardl
+  - pow
+  - pow10
+  - pow10f
+  - powf
+  - powl
+  - remainder
+  - remainderf
+  - remainderl
+  - remquo
+  - remquof
+  - remquol
+  - rint
+  - rintf
+  - rintl
+  - round
+  - roundf
+  - roundl
+  - scalbln
+  - scalblnf
+  - scalblnl
+  - scalbn
+  - scalbnf
+  - scalbnl
+  - sin
+  - sincos
+  - sincosf
+  - sinf
+  - sinh
+  - sinhf
+  - sinhl
+  - sinl
+  - sqrt
+  - sqrtf
+  - sqrtl
+  - tan
+  - tanf
+  - tanh
+  - tanhf
+  - tanhl
+  - tanl
+  - tgamma
+  - tgammaf
+  - tgammal
+  - trunc
+  - truncf
+  - truncl
+  - y0
+  - y0f
+  - y1
+  - y1f
+  - yn
+  - ynf
 
 simple_function_extern:
   - __ltdf2
