@@ -61,9 +61,10 @@ static void task_killed(int idx, void* ti) {
 
 void task_info_init() {
     TaskHandle_t handle = xTaskGetCurrentTaskHandle();
+    task_info_t *task_info = malloc(sizeof(task_info_t));
+
     ESP_LOGI(TAG, "Creating task_info %p for task %p", task_info, handle);
 
-    task_info_t *task_info = malloc(sizeof(task_info_t));
     memset(task_info, 0, sizeof(task_info_t));
 
     task_info->term = strdup("dumb");
