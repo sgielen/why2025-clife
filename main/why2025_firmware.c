@@ -1,7 +1,10 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <sys/types.h>
 #include <sys/errno.h>
+#include <regex.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -12,6 +15,7 @@
 #include "khash.h"
 
 #define MAXFD 128
+#define STRERROR_BUFLEN 128
 
 extern uintptr_t elf_find_sym(const char *sym_name);
 
@@ -44,6 +48,13 @@ typedef struct {
     size_t current_files;
     file_handle_t file_handles[MAXFD];
     char *term;
+    char strerror_buf[STRERROR_BUFLEN];
+    unsigned int seed;
+    char *strtok_saveptr;
+    char asctime_buf[26];
+    char ctime_buf[26];
+    struct tm gmtime_tm;
+    struct tm localtime_tm;
 } task_info_t;
 
 task_info_t *get_task_info() {
@@ -60,9 +71,58 @@ task_info_t *get_task_info() {
     return task_info;
 }
 
+char *why_strerror(int errnum) {
+    task_info_t *task_info = get_task_info();
+    return strerror_r(errnum, task_info->strerror_buf, STRERROR_BUFLEN);
+}
+
+char *why_strtok(char *str, const char *delim) {
+    task_info_t *task_info = get_task_info();
+    return strtok_r(str, delim, &task_info->strtok_saveptr);
+}
+
+char *why_asctime(const struct tm *tm) {
+    task_info_t *task_info = get_task_info();
+    return asctime_r(tm, task_info->asctime_buf);
+}
+
+char *why_ctime(const time_t *timep) {
+    task_info_t *task_info = get_task_info();
+    return ctime_r(timep, task_info->ctime_buf);
+}
+
+struct tm *why_gmtime(const time_t *timep) {
+    task_info_t *task_info = get_task_info();
+    return gmtime_r(timep, &task_info->gmtime_tm);
+}
+
+struct tm *why_localtime(const time_t *timep) {
+    task_info_t *task_info = get_task_info();
+    return localtime_r(timep, &task_info->localtime_tm);
+}
+
+int why_rand() {
+    task_info_t *task_info = get_task_info();
+    return rand_r(&task_info->seed);
+}
+
+void why_srand(unsigned int seed) {
+    task_info_t *task_info = get_task_info();
+    task_info->seed = seed;
+}
+
+void why_srandom(unsigned int seed) {
+    task_info_t *task_info = get_task_info();
+    task_info->seed = seed;
+}
+
+long why_random() {
+    task_info_t *task_info = get_task_info();
+    return rand_r(&task_info->seed);
+}
+
 int *why_errno() {
     task_info_t *task_info = get_task_info();
-
     return &task_info->_errno;
 }
 
@@ -95,6 +155,20 @@ void *why_malloc(size_t size) {
     ESP_LOGI("why_malloc", "Calling malloc from task %p with size %zi", task_info->handle, size);
 
     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+}
+
+int why_regcomp(regex_t *restrict preg, const char *restrict regex, int cflags) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_regcomp", "Calling regcomp from task %p", task_info->handle);
+
+    return regcomp(preg, regex, cflags);
+}
+
+void why_regfree(regex_t *preg) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_regfree", "Calling regfree from task %p", task_info->handle);
+
+    return regfree(preg);
 }
 
 int why_tcgetattr(int fd, struct termios *termios_p) {

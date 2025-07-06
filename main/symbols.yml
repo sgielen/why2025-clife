@@ -31,12 +31,12 @@ simple_function:
 # libc.a
   - _ctype_
   - a64l
-  - abort
+#  - abort
   - abs
-  - aligned_alloc
-  - arc4random
-  - arc4random_buf
-  - arc4random_uniform
+#  - aligned_alloc
+#  - arc4random
+#  - arc4random_buf
+#  - arc4random_uniform
 #  - argz_add
 #  - argz_add_sep
 #  - argz_append
@@ -49,7 +49,7 @@ simple_function:
 #  - argz_next
 #  - argz_replace
 #  - argz_stringify
-  - asctime
+#  - asctime
   - asctime_r
 #  - asiprintf
 #  - asniprintf
@@ -69,12 +69,12 @@ simple_function:
   - bzero
 #  - calloc
 #  - category
-  - clearerr
-  - clearerr_unlocked
+#  - clearerr
+#  - clearerr_unlocked
   - clock
 #  - close
 #  - creat
-  - ctime
+#  - ctime
   - ctime_r
 #  - dbm_clearerr
 #  - dbm_close
@@ -91,8 +91,8 @@ simple_function:
   - diprintf
   - div
 #  - dprintf
-  - drand48
-  - duplocale
+#  - drand48
+#  - duplocale
 #  - ecvt
 #  - ecvtbuf
 #  - ecvtf
@@ -102,7 +102,7 @@ simple_function:
 #  - envz_merge
 #  - envz_remove
 #  - envz_strip
-  - erand48
+#  - erand48
 #  - execve
 #  - exit
   - explicit_bzero
@@ -197,7 +197,7 @@ simple_function:
 #  - getwchar
 #  - getwchar_unlocked
 #  - getwc_unlocked
-  - gmtime
+#  - gmtime
   - gmtime_r
 #  - hcreate
 #  - hcreate_r
@@ -268,20 +268,20 @@ simple_function:
   - isxdigit
   - isxdigit_l
   - itoa
-  - jrand48
+#  - jrand48
 #  - kill
   - l64a
   - labs
-  - lcong48
+#  - lcong48
   - ldiv
   - link
   - llabs
   - lldiv
   - localeconv
-  - localtime
+#  - localtime
   - localtime_r
   - longjmp
-  - lrand48
+#  - lrand48
 #  - lseek
 #  - mallinfo
 #  - malloc
@@ -316,14 +316,14 @@ simple_function:
   - mktime
   - modf
   - modff
-  - mrand48
+#  - mrand48
 #  - mstats
   - nan
   - nanf
-  - newlocale
+#  - newlocale
   - nl_langinfo
   - nl_langinfo_l
-  - nrand48
+#  - nrand48
 #  - on_exit
 #  - open
 #  - open_memstream
@@ -347,18 +347,18 @@ simple_function:
   - qsort_r
 #  - quick_exit
 #  - raise
-  - rand
-  - random
+#  - rand
+#  - random
   - rand_r
   - rawmemchr
 #  - read
 #  - realloc
 #  - reallocarray
 #  - reallocf
-  - regcomp
+#  - regcomp
   - regerror
   - regexec
-  - regfree
+#  - regfree
 #  - remove
 #  - rename
 #  - rewind
@@ -366,15 +366,15 @@ simple_function:
   - rpmatch
 #  - sbrk
 #  - scanf
-  - seed48
-  - setbuf
-  - setbuffer
+#  - seed48
+#  - setbuf
+#  - setbuffer
 #  - setenv
   - setjmp
   - setlinebuf
-  - setlocale
+#  - setlocale
 #  - set_ones
-  - setvbuf
+#  - setvbuf
   - sig2str
 #  - siprintf
 #  - siscanf
@@ -382,9 +382,9 @@ simple_function:
   - sniprintf
   - snprintf
   - sprintf
-  - srand
-  - srand48
-  - srandom
+#  - srand
+#  - srand48
+#  - srandom
   - sscanf
 #  - stat
   - stpcpy
@@ -402,8 +402,8 @@ simple_function:
   - strcpy
   - strcspn
 #  - strdup
-  - strerror
-  - strerror_l
+#  - strerror
+#  - strerror_l
   - strerror_r
   - strftime
   - strftime_l
@@ -433,7 +433,7 @@ simple_function:
   - strtof_l
   - strtoimax
   - strtoimax_l
-  - strtok
+#  - strtok
   - strtok_r
   - strtol
   - strtold
@@ -880,9 +880,11 @@ simple_object:
   - __errno
 
 wrapped_function:
+  - asctime
   - atexit
   - calloc
   - close
+  - ctime
   - fclose
   - fdopen
   - fflush
@@ -897,17 +899,27 @@ wrapped_function:
   - fseek
   - fseeko
   - getenv
+  - gmtime
   - isatty
+  - localtime
   - lseek
   - malloc
   - open
   - printf
   - puts
+  - rand
+  - random
   - read
   - realloc
   - reallocarray
+  - regcomp
+  - regfree
+  - srand
+  - srandom
   - strdup
+  - strerror
   - strndup
+  - strtok
   - tcgetattr
   - tcsetattr
   - write
