@@ -45,7 +45,7 @@ static struct __file_bufio __stderr = FDEV_SETUP_POSIX(2, write_buf, __PICOLIBC_
 
 FILE *const __posix_stderr = &__stderr.xfile.cfile.file;
 
-__weak_reference(__posix_stderr,stderr);
+__weak_reference(__posix_stderr,why_stderr);
 
 #if __PICOLIBC_STDERR_BUFSIZE > 1
 /*
@@ -55,6 +55,6 @@ __weak_reference(__posix_stderr,stderr);
 __attribute__((destructor (101)))
 static void posix_exit(void)
 {
-    fflush(stderr);
+    fflush(why_stderr);
 }
 #endif

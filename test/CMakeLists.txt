@@ -29,6 +29,7 @@ function(build_test_elf name source)
             -fvisibility=hidden
 	    -Wl,--gc-sections
 	    -e main
+	    -include fix_stdio.h
 	    -I${CMAKE_CURRENT_SOURCE_DIR}
             -o ${TEST_ELF_DIR}/${name}.elf
             ${CMAKE_CURRENT_SOURCE_DIR}/${source}

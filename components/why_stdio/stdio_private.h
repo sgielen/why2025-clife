@@ -32,7 +32,9 @@
 #ifndef _STDIO_PRIVATE_H_
 #define _STDIO_PRIVATE_H_
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -48,6 +50,18 @@
 #include <limits.h>
 #include <stdio-bufio.h>
 #include <sys/lock.h>
+
+extern FILE *const why_stdin;
+extern FILE *const why_stdout;
+extern FILE *const why_stderr;
+
+#undef stdin
+#undef stdout
+#undef stderr
+
+#define stdin why_stdin
+#define stdout why_stdout
+#define stderr why_stderr
 
 extern int why_open(const char *pathname, int flags, mode_t mode);
 extern int why_close(int fd);

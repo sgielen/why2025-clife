@@ -41,7 +41,7 @@ static struct __file_bufio __stdout = FDEV_SETUP_POSIX(1, write_buf, BUFSIZ, __S
 
 FILE *const __posix_stdout = &__stdout.xfile.cfile.file;
 
-__weak_reference(__posix_stdout,stdout);
+__weak_reference(__posix_stdout,why_stdout);
 
 /*
  * Add a destructor function to get stdout flushed on
@@ -50,5 +50,5 @@ __weak_reference(__posix_stdout,stdout);
 __attribute__((destructor (101)))
 static void posix_exit(void)
 {
-    fflush(stdout);
+    fflush(why_stdout);
 }

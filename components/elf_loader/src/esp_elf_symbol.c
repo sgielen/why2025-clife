@@ -201,7 +201,15 @@ extern int why_fputs(const char *str, FILE *stream);
 extern int why_fputc(int c, FILE *stream);
 extern int why_fileno(FILE *stream);
 
+extern FILE *const why_stdin;
+extern FILE *const why_stdout;
+extern FILE *const why_stderr;
+
 static const struct esp_elfsym g_why2025_libc_elfsyms[] = {
+    ESP_ELFSYM_EXPORT_WHY(stdin),
+    ESP_ELFSYM_EXPORT_WHY(stdout),
+    ESP_ELFSYM_EXPORT_WHY(stderr),
+
     ESP_ELFSYM_EXPORT_WHY(malloc),
     ESP_ELFSYM_EXPORT_WHY(free),
     ESP_ELFSYM_EXPORT_WHY(calloc),
