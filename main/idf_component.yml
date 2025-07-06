@@ -2,3 +2,6 @@ dependencies:
   elf_loader:
     version: "1.*"
     override_path: "../components/elf_loader"
+  why_stdio:
+    version: "1.*"
+    override_path: "../components/why_stdio"

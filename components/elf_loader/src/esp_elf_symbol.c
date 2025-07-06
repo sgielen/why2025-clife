@@ -45,17 +45,6 @@ static const struct esp_elfsym g_esp_libc_elfsyms[] = {
     ESP_ELFSYM_EXPORT(strcspn),
     ESP_ELFSYM_EXPORT(strncat),
 
-    /* stdio.h */
-
-    ESP_ELFSYM_EXPORT(puts),
-    ESP_ELFSYM_EXPORT(putchar),
-    ESP_ELFSYM_EXPORT(fputc),
-    ESP_ELFSYM_EXPORT(fputs),
-    ESP_ELFSYM_EXPORT(printf),
-    ESP_ELFSYM_EXPORT(vfprintf),
-    ESP_ELFSYM_EXPORT(fprintf),
-    ESP_ELFSYM_EXPORT(fwrite),
-
     /* unistd.h */
 
     ESP_ELFSYM_EXPORT(usleep),
@@ -65,7 +54,7 @@ static const struct esp_elfsym g_esp_libc_elfsyms[] = {
 
     /* stdlib.h */
 
-    //ESP_ELFSYM_EXPORT_RENAME(malloc, my_malloc),
+    //ESP_ELFSYM_EXPORT_WHY(malloc, my_malloc),
     //ESP_ELFSYM_EXPORT(calloc),
     //ESP_ELFSYM_EXPORT(realloc),
     //ESP_ELFSYM_EXPORT(free),
@@ -150,11 +139,50 @@ static const struct esp_elfsym g_esp_espidf_elfsyms[] = {
 };
 
 extern void *why_malloc(size_t size);
-extern ssize_t *why_write(int fd, const void *buf, size_t count);
+extern void why_free(void *ptr);
+extern void *why_calloc(size_t nmemb, size_t size);
+extern void *why_realloc(void *ptr, size_t size);
+extern void *why_reallocarray(void *ptr, size_t nmemb, size_t size);
+
+extern int why_open(const char *pathname, int flags, mode_t mode);
+extern int why_close(int fd);
+
+extern ssize_t why_write(int fd, const void *buf, size_t count);
+extern ssize_t why_read(int fd, void *buf, size_t count);
+extern off_t why_lseek(int fd, off_t offset, int whence);
+
+extern int why_printf(const char *fmt, ...);
+extern int why_puts(const char *str);
+
+extern FILE *why_fopen(const char *path, const char *mode);
+extern int why_fclose(FILE *__stream);
+extern int why_fseek(FILE *stream, long offset, int whence);
+extern int why_fseeko(FILE *stream, __off_t offset, int whence);
+extern int why_fflush(FILE *stream);
+
+extern FILE *why_fdopen(int, const char *);
+extern int why_fprintf(FILE *__stream, const char *__fmt, ...);
 
 static const struct esp_elfsym g_why2025_libc_elfsyms[] = {
-    ESP_ELFSYM_EXPORT_RENAME(malloc, why_malloc),
-    ESP_ELFSYM_EXPORT_RENAME(write, why_write),
+    ESP_ELFSYM_EXPORT_WHY(malloc),
+    ESP_ELFSYM_EXPORT_WHY(free),
+    ESP_ELFSYM_EXPORT_WHY(calloc),
+    ESP_ELFSYM_EXPORT_WHY(realloc),
+    ESP_ELFSYM_EXPORT_WHY(reallocarray),
+    ESP_ELFSYM_EXPORT_WHY(open),
+    ESP_ELFSYM_EXPORT_WHY(close),
+    ESP_ELFSYM_EXPORT_WHY(fseek),
+    ESP_ELFSYM_EXPORT_WHY(fseeko),
+    ESP_ELFSYM_EXPORT_WHY(fflush),
+    ESP_ELFSYM_EXPORT_WHY(write),
+    ESP_ELFSYM_EXPORT_WHY(read),
+    ESP_ELFSYM_EXPORT_WHY(lseek),
+    ESP_ELFSYM_EXPORT_WHY(printf),
+    ESP_ELFSYM_EXPORT_WHY(puts),
+    ESP_ELFSYM_EXPORT_WHY(fopen),
+    ESP_ELFSYM_EXPORT_WHY(fclose),
+    ESP_ELFSYM_EXPORT_WHY(fdopen),
+    ESP_ELFSYM_EXPORT_WHY(fprintf),
     ESP_ELFSYM_END
 };
 

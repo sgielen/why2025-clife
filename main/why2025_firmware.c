@@ -10,6 +10,8 @@
 #include "esp_elf.h"
 #include "khash.h"
 
+#define MAXFD 128
+
 static const char *TAG = "elf_loader";
 
 extern const uint8_t test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
@@ -22,37 +24,153 @@ khash_t(ptable) *process_table;
 
 typedef struct {
    bool is_open : 1;
-   const char* file;
+   bool is_stdin : 1;
+   bool is_stdout : 1;
+   bool is_stderr : 1;
+   char* file;
 } file_handle_t;
 
 typedef struct {
+    int _errno;
+    TaskHandle_t handle;
     size_t max_memory;
     size_t current_memory;
     size_t max_files;
     size_t current_files;
-    file_handle_t file_handles[128];
+    file_handle_t file_handles[MAXFD];
 } task_info_t;
 
-void *why_malloc(size_t size) {
+task_info_t *get_task_info() {
     TaskHandle_t h = xTaskGetCurrentTaskHandle();
     task_info_t *task_info = NULL;
+
+    ESP_LOGD("get_task_info", "Got process_handle %p == %p\n", h, task_info);
 
     khint_t k = kh_get(ptable, process_table, (uintptr_t)h);
     if (k != kh_end(process_table)) {
        task_info = kh_value(process_table, k);
     }
 
-    printf("Got process_handle %p == %p\n", h, task_info);
-    ESP_LOGI("why_malloc", "Calling malloc from task %p", h);
-    ESP_LOGI("why_malloc", "0 is_open: %i", task_info->file_handles[0].is_open);
-    ESP_LOGI("why_malloc", "4 is_open: %i", task_info->file_handles[4].is_open);
+    return task_info;
+}
+
+int *why_errno() {
+    task_info_t *task_info = get_task_info();
+
+    return &task_info->_errno;
+}
+
+void *why_malloc(size_t size) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_malloc", "Calling malloc from task %p", task_info->handle);
+
     return malloc(size);
 }
 
+void why_free(void *_Nullable ptr) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_free", "Calling free from task %p", task_info->handle);
+    free(ptr);
+}
+
+void *why_calloc(size_t nmemb, size_t size) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_calloc", "Calling calloc from task %p", task_info->handle);
+    return calloc(nmemb, size);
+}
+
+void *why_realloc(void *_Nullable ptr, size_t size) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_realloc", "Calling realloc from task %p", task_info->handle);
+    return realloc(ptr, size);
+}
+
+void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_reallocarray", "Calling reallocarray from task %p", task_info->handle);
+    return reallocarray(ptr, nmemb, size);
+}
+
 ssize_t why_write(int fd, const void *buf, size_t count) {
-    TaskHandle_t h = xTaskGetCurrentTaskHandle();
-    ESP_LOGI("why_write", "Calling write from task %p", h);
-    return write(fd, buf, count);
+    task_info_t *task_info = get_task_info();
+
+    ESP_LOGI("why_write", "Calling write from task %p fd = %i count = %zi", task_info->handle, fd, count);
+    if (task_info->file_handles[fd].is_stdout == true) {
+        ESP_LOGI("why_write", "Calling write from task %p fd = %i count = %zi is_stdout == true", task_info->handle, fd, count);
+	    for (size_t i = 0; i < count; ++i) {
+		    putchar(((const char*)buf)[i]);
+	    }
+	    return count;
+    }
+    return 0;
+}
+
+ssize_t why_read(int fd, void *buf, size_t count) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_read", "Calling read from task %p", task_info->handle);
+
+    return 0;
+}
+
+off_t why_lseek(int fd, off_t offset, int whence) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_lseek", "Calling lseek from task %p", task_info->handle);
+    return 0;
+}
+
+int why_close(int fd) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_close", "Calling close from task %p", task_info->handle);
+
+    if (fd > MAXFD) goto out;
+
+    if (task_info->file_handles[fd].is_open) {
+        free(task_info->file_handles[fd].file);
+        memset(&task_info->file_handles[fd], 0, sizeof(file_handle_t));
+        return 0;
+    }
+
+out:
+    task_info->_errno = EBADF;
+    return -1;
+}
+
+int why_puts(const char *str) {
+    return puts(str);
+}
+
+int why_open(const char *pathname, int flags, mode_t mode) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_open", "Calling open from task %p for path %s", task_info->handle, pathname);
+    int fd = -1;
+
+    for (int i = 0; i < MAXFD; ++i) {
+        if (task_info->file_handles[fd].is_open == false) {
+            fd = i;
+            break;
+        }
+    }
+
+    if (fd == -1) {
+        task_info->_errno = ENOMEM;
+        goto out;
+    }
+
+    if (strcmp(pathname, "SYS$INPUT") == 0) {
+        task_info->file_handles[fd].is_stdin = true;
+    }
+
+    if (strcmp(pathname, "SYS$OUTPUT") == 0) {
+        task_info->file_handles[fd].is_stdout = true;
+    }
+
+    if (strcmp(pathname, "SYS$ERROR") == 0) {
+        task_info->file_handles[fd].is_stderr = true;
+    }
+
+out:
+    ESP_LOGI("why_open", "Calling open from task %p for path %s returning %i", task_info->handle, pathname, fd);
+    return fd;
 }
 
 void run_elf(void *buffer) {
@@ -60,14 +178,20 @@ void run_elf(void *buffer) {
     char **argv = NULL;
     int ret;
 
+    TaskHandle_t h = xTaskGetCurrentTaskHandle();
+
     task_info_t task_info;
     memset(&task_info, 0, sizeof(task_info));
-    task_info.current_files = 3;
-    task_info.file_handles[0].is_open = true;
-    task_info.file_handles[1].is_open = true;
-    task_info.file_handles[2].is_open = true;
 
-    TaskHandle_t h = xTaskGetCurrentTaskHandle();
+    task_info.current_files = 3;
+    task_info.handle = h;
+    task_info.file_handles[0].is_open = true;
+    task_info.file_handles[0].is_stdin = true;
+    task_info.file_handles[1].is_open = true;
+    task_info.file_handles[1].is_stdout = true;
+    task_info.file_handles[2].is_open = true;
+    task_info.file_handles[2].is_stderr = true;
+
     printf("Setting process_handle to %p == %p\n", h, &task_info);
     int r;
     khint_t k = kh_put(ptable, process_table, (uintptr_t)h, &r);
@@ -104,7 +228,7 @@ int app_main(void) {
     printf("Hello ESP32P4 firmware\n");
 
     xTaskCreate(run_elf, "Task1", 4096, test_elf_a_start, 5, &elf_a); 
-    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
+//    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Suspending worker task A\n");
@@ -118,9 +242,9 @@ int app_main(void) {
     printf("Killing worker task A\n");
     vTaskDelete(elf_a);
 
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    printf("Killing worker task B\n");
-    vTaskDelete(elf_b);
+ //   vTaskDelay(5000 / portTICK_PERIOD_MS);
+ //   printf("Killing worker task B\n");
+ //   vTaskDelete(elf_b);
 
     printf("Sleeping for a bit\n");
     vTaskDelay(5000 / portTICK_PERIOD_MS);

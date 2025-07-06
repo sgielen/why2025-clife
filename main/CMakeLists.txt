@@ -3,3 +3,4 @@ idf_component_register(
     INCLUDE_DIRS "."
     EMBED_FILES "${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf" "${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
 )
+

@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 #define ESP_ELFSYM_EXPORT(_sym)     { #_sym, &_sym }
-#define ESP_ELFSYM_EXPORT_RENAME(_name, _sym)     { #_name, &_sym }
+#define ESP_ELFSYM_EXPORT_WHY(_sym)     { #_sym, &why_ ##_sym }
 #define ESP_ELFSYM_END              { NULL,  NULL }
 
 /** @brief Function symbol description */

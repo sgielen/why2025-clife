@@ -1,0 +1,9 @@
+version: "1.0.0"
+description: Picolib STDIO
+url: https://github.com/picolibc/picolibc
+dependencies:
+  idf: ">=4.4.3"
+  espressif/cmake_utilities: "0.*"
+sbom:
+  supplier: 'Organization: WHY2025 Team:Badge HP van Braam' 
+  originator: 'Organization: Picolibc'
