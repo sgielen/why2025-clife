@@ -36,7 +36,7 @@
 #endif
 
 size_t
-fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+why_fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t i, j;
 	const uint8_t *cp = (const uint8_t *) ptr;

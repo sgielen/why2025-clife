@@ -63,11 +63,11 @@ No supporting OS subroutines are required.
 #include <stdio_private.h>
 
 int
-fgetpos (
+why_fgetpos (
        FILE *__restrict fp,
        _fpos_t *__restrict pos)
 {
-  *pos = ftell ( fp);
+  *pos = why_ftell ( fp);
 
   if (*pos != -1)
     {

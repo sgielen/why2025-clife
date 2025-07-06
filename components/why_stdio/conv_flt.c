@@ -576,7 +576,7 @@ conv_flt (FLT_STREAM *stream, FLT_CONTEXT *context, width_t width, void *addr, u
 #ifdef _NEED_IO_FLOAT_LARGE
             if (CHECK_LONG_LONG() && __SIZEOF_LONG_DOUBLE__ > 8)
             {
-                flt = (FLOAT) __atold_engine(UF_TO_U128(uint), exp);
+                flt = (FLOAT) __why_atold_engine(UF_TO_U128(uint), exp);
             }
             else
 #endif
@@ -591,7 +591,7 @@ conv_flt (FLT_STREAM *stream, FLT_CONTEXT *context, width_t width, void *addr, u
                     // Number is larger than 1e+309, which should be rounded to +/-Infinity.
                     flt = (FLOAT) INFINITY;
 		} else {
-                    flt = (FLOAT) __atod_engine(UF_TO_U64(uint), exp);
+                    flt = (FLOAT) __why_atod_engine(UF_TO_U64(uint), exp);
                 }
             }
             else
@@ -604,7 +604,7 @@ conv_flt (FLT_STREAM *stream, FLT_CONTEXT *context, width_t width, void *addr, u
                     // Number is larger than 1e+39, which should be rounded to +/-Infinity.
                     flt = (FLOAT) INFINITY;
 		} else {
-                    flt = (FLOAT) __atof_engine(UF_TO_U32(uint), exp);
+                    flt = (FLOAT) __why_atof_engine(UF_TO_U32(uint), exp);
                 }
             }
         }

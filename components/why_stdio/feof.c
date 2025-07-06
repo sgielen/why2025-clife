@@ -35,25 +35,25 @@
 #undef feof_unlocked
 
 int
-__STDIO_UNLOCKED(feof)(FILE *stream)
+__STDIO_UNLOCKED(why_feof)(FILE *stream)
 {
 	return stream->flags & __SEOF;
 }
 
 #ifdef __STDIO_LOCKING
 int
-feof(FILE *stream)
+why_feof(FILE *stream)
 {
     int ret;
     __flockfile(stream);
-    ret = __STDIO_UNLOCKED(feof)(stream);
+    ret = __STDIO_UNLOCKED(why_feof)(stream);
     __funlockfile(stream);
     return ret;
 }
 #else
 #ifdef __strong_reference
-__strong_reference(feof, feof_unlocked);
+__strong_reference(why_feof, why_feof_unlocked);
 #else
-int feof_unlocked(FILE *stream) { return feof(stream); }
+int why_feof_unlocked(FILE *stream) { return why_feof(stream); }
 #endif
 #endif

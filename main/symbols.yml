@@ -26,6 +26,7 @@ include:
   - wchar.h
   - wctype.h
   - complex.h
+  - iconv.h
 
 simple_function:
 # libc.a
@@ -205,7 +206,7 @@ simple_function:
 #  - hdestroy_r
 #  - hsearch
 #  - hsearch_r
-#  - iconv
+  - iconv
 #  - iconv_close
 #  - iconv_open
   - imaxabs
@@ -371,7 +372,7 @@ simple_function:
 #  - setbuffer
 #  - setenv
   - setjmp
-  - setlinebuf
+#  - setlinebuf
 #  - setlocale
 #  - set_ones
 #  - setvbuf
@@ -887,6 +888,8 @@ wrapped_function:
   - ctime
   - fclose
   - fdopen
+  - feof
+  - ferror
   - fflush
   - fgetc
   - fgets
@@ -896,10 +899,16 @@ wrapped_function:
   - fputc
   - fputs
   - free
+  - fscanf
   - fseek
   - fseeko
+  - ftell
+  - ftello
+  - fwrite
   - getenv
   - gmtime
+  - iconv_close
+  - iconv_open
   - isatty
   - localtime
   - lseek
@@ -914,6 +923,11 @@ wrapped_function:
   - reallocarray
   - regcomp
   - regfree
+  - scanf
+  - setbuf
+  - setbuffer
+  - setlinebuf
+  - setvbuf
   - srand
   - srandom
   - strdup
@@ -922,7 +936,10 @@ wrapped_function:
   - strtok
   - tcgetattr
   - tcsetattr
+  - vfscanf
+  - wcsdup
   - write
+  - fgetpos
 
 wrapped_object:
   - stdin

@@ -64,7 +64,7 @@ static inline FLOAT64 int64Bits2Double(uint64_t bits) {
 }
 
 FLOAT64
-__atod_engine(uint64_t m10, int e10)
+__why_atod_engine(uint64_t m10, int e10)
 {
 #ifdef RYU_DEBUG
     printf("m10 = %lu\n", m10);

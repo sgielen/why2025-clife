@@ -361,7 +361,7 @@ static inline bool d2d_small_int(const uint64_t ieeeMantissa, const uint32_t iee
 }
 
 int
-__dtoa_engine(FLOAT64 x, struct dtoa *dtoa, int max_digits, bool fmode, int max_decimals)
+__why_dtoa_engine(FLOAT64 x, struct dtoa *dtoa, int max_digits, bool fmode, int max_decimals)
 {
 	// Step 1: Decode the floating-point number, and unify normalized and subnormal cases.
 	const uint64_t bits = ryu64_to_bits(x);

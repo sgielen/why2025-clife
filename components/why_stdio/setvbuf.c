@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 int
-setvbuf(FILE *stream, char *buf, int mode, size_t size)
+why_setvbuf(FILE *stream, char *buf, int mode, size_t size)
 {
         struct __file_ext *xf = (struct __file_ext *) stream;
         int ret = 0;

@@ -1,4 +1,5 @@
 idf_component_register( SRCS
+  ctype.c
   #asnprintf.c
   #asprintf.c
   #atold_engine.c
@@ -22,11 +23,12 @@ idf_component_register( SRCS
   #fcvt_r.c
   #fdevopen.c
   fdopen.c
-  #feof.c
-  #ferror.c
+  feof.c
+  ferror.c
   fflush.c
   fgetc.c
   fgets.c
+  fgetpos.c
   #fgetwc.c
   #fgetws.c
   fileno.c
@@ -44,18 +46,18 @@ idf_component_register( SRCS
   #fputws.c
   #fread.c
   #freopen.c
-  #fscanf.c
+  fscanf.c
   fseek.c
   fseeko.c
-  #ftell.c
-  #ftello.c
+  ftell.c
+  ftello.c
   #ftox_engine.c
   #ftrylockfile.c
   #funlockfile.c
   #funopen.c
   #fwide.c
   #fwprintf.c
-  #fwrite.c
+  fwrite.c
   #fwscanf.c
   #gcvt.c
   #gcvtf.c
@@ -76,11 +78,11 @@ idf_component_register( SRCS
   #putwchar.c
   #remove.c
   #rewind.c
-  #scanf.c
-  #setbuf.c
-  #setbuffer.c
-  #setlinebuf.c
-  #setvbuf.c
+  scanf.c
+  setbuf.c
+  setbuffer.c
+  setlinebuf.c
+  setvbuf.c
   sflags.c
   #snprintf.c
   #snprintfd.c
@@ -127,7 +129,7 @@ idf_component_register( SRCS
   #vfmprintf.c
   #vfmscanf.c
   vfprintf.c
-  #vfscanf.c
+  vfscanf.c
   #vfwprintf.c
   #vfwscanf.c
   #vprintf.c
@@ -162,21 +164,21 @@ idf_component_register( SRCS
   #sprintf_s.c
   #vfprintf_s.c
   #vsnprintf_s.c
-  #atod_ryu.c
-  #atof_ryu.c
-  #dtoa_ryu.c
-  #ftoa_ryu.c
-  #ryu_divpow2.c
-  #ryu_log10.c
-  #ryu_log2pow5.c
-  #ryu_pow5bits.c
-  #ryu_table.c
-  #ryu_umul128.c
+  atod_ryu.c
+  atof_ryu.c
+  dtoa_ryu.c
+  ftoa_ryu.c
+  ryu_divpow2.c
+  ryu_log10.c
+  ryu_log2pow5.c
+  ryu_pow5bits.c
+  ryu_table.c
+  ryu_umul128.c
   posixiob_stdin.c
   posixiob_stdout.c
   posixiob_stderr.c
   
-  PRIV_INCLUDE_DIRS "include" "stdlib" "." 
+  PRIV_INCLUDE_DIRS "." 
 )
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
@@ -188,4 +190,7 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -nostdinc
     -fno-builtin
     -fno-builtin-functions
+    "SHELL:-isystem ${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "SHELL:-isystem ${CMAKE_CURRENT_SOURCE_DIR}/include/sys"
+    "SHELL:-isystem ${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
 )

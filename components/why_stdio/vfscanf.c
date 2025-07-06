@@ -34,7 +34,7 @@
 
 #ifndef SCANF_NAME
 # define SCANF_VARIANT __IO_VARIANT_DOUBLE
-# define SCANF_NAME __d_vfscanf
+# define SCANF_NAME __d_why_vfscanf
 #endif
 
 #include "stdio_private.h"
@@ -43,7 +43,7 @@
 #include "stdlib/local.h"
 
 # if __IO_DEFAULT != SCANF_VARIANT || defined(WIDE_CHARS)
-#  define vfscanf SCANF_NAME
+#  define why_vfscanf SCANF_NAME
 # endif
 
 /*
@@ -585,7 +585,7 @@ skip_to_arg(my_va_list *ap, int target_argno)
      -Wl,-u,vfscanf -lscanf_min -lm
      \endcode
 */
-int vfscanf (FILE * stream, const CHAR *fmt, va_list ap_orig)
+int why_vfscanf (FILE * stream, const CHAR *fmt, va_list ap_orig)
 {
     unsigned char nconvs;
     UCHAR c;
@@ -879,9 +879,9 @@ int vfscanf (FILE * stream, const CHAR *fmt, va_list ap_orig)
 # if SCANF_VARIANT == __IO_DEFAULT
 #  undef vfscanf
 #  ifdef __strong_reference
-__strong_reference(vfscanf, SCANF_NAME);
+__strong_reference(why_vfscanf, SCANF_NAME);
 #  else
-int SCANF_NAME (FILE * stream, const char *fmt, va_list ap) { return vfscanf(stream, fmt, ap); }
+int SCANF_NAME (FILE * stream, const char *fmt, va_list ap) { return why_vfscanf(stream, fmt, ap); }
 #  endif
 # endif
 #endif

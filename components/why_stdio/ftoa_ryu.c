@@ -296,7 +296,7 @@ f2d(const uint32_t ieeeMantissa, const uint32_t ieeeExponent, int max_digits, bo
 }
 
 int
-__ftoa_engine(float x, struct dtoa *dtoa, int max_digits, bool fmode, int max_decimals)
+__why_ftoa_engine(float x, struct dtoa *dtoa, int max_digits, bool fmode, int max_decimals)
 {
 	// Step 1: Decode the floating-point number, and unify normalized and subnormal cases.
 	const uint32_t bits = float_to_bits(x);

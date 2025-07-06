@@ -1,3 +1,4 @@
+#include <wchar.h>
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <regex.h>
@@ -5,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <iconv.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -157,6 +159,20 @@ void *why_malloc(size_t size) {
     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
 }
 
+iconv_t why_iconv_open(const char *tocode, const char *fromcode) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_iconv_open", "Calling iconv_open from task %p", task_info->handle);
+
+    return iconv_open(tocode, fromcode);
+}
+
+int why_iconv_close(iconv_t cd) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_iconv_close", "Calling iconv_close from task %p", task_info->handle);
+
+    return iconv_close(cd);
+}
+
 int why_regcomp(regex_t *restrict preg, const char *restrict regex, int cflags) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("why_regcomp", "Calling regcomp from task %p", task_info->handle);
@@ -177,6 +193,13 @@ int why_tcgetattr(int fd, struct termios *termios_p) {
 
 int why_tcsetattr(int fd, int optional_actions, const struct termios *termios_p) {
     return 0;
+}
+
+wchar_t *why_wcsdup(const wchar_t *s) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_wcsdup", "Calling wcsdup from task %p", task_info->handle);
+
+    return wcsdup(s);
 }
 
 char *why_strdup(const char *s) {

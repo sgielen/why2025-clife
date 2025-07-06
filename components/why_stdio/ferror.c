@@ -35,18 +35,18 @@
 #undef ferror_unlocked
 
 int
-__STDIO_UNLOCKED(ferror)(FILE *stream)
+__STDIO_UNLOCKED(why_ferror)(FILE *stream)
 {
 	return stream->flags & __SERR;
 }
 
 #ifdef __STDIO_LOCKING
 int
-ferror(FILE *stream)
+why_ferror(FILE *stream)
 {
     int ret;
     __flockfile(stream);
-    ret = ferror_unlocked(stream);
+    ret = why_ferror_unlocked(stream);
     __funlockfile(stream);
     return ret;
 }

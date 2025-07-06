@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 #ifndef FTELL
-#define FTELL ftell
+#define FTELL why_ftell
 #define FTELL_TYPE long
 #endif
 

@@ -77,6 +77,22 @@ extern void *why_reallocarray(void * ptr, size_t nmemb, size_t size);
 
 extern int printf(const char *restrict format, ...);
 
+extern void why_setbuf(FILE *stream, char *buf);
+extern int why_setvbuf(FILE *stream, char *buf, int mode, size_t size);
+extern void why_setbuffer(FILE *stream, char *buf, size_t size);
+extern void why_setlinebuf(FILE *stream);
+
+extern long why_ftell(FILE *stream);
+extern __off_t why_ftello(FILE *stream);
+
+#ifdef WIDE_CHARS
+# define CHAR wchar_t
+#else
+# define CHAR char
+#endif
+
+extern int why_vfscanf (FILE * stream, const CHAR *fmt, va_list ap_orig);
+
 struct __file_str {
 	struct __file file;	/* main file struct */
         char	*pos;		/* current buffer position */
@@ -336,11 +352,11 @@ int	__m_vfscanf(FILE *__stream, const char *__fmt, va_list __ap) __FORMAT_ATTRIB
 
 #ifdef FLOAT64
 FLOAT64
-__atod_engine(uint64_t m10, int e10);
+__why_atod_engine(uint64_t m10, int e10);
 #endif
 
 float
-__atof_engine(uint32_t m10, int e10);
+__why_atof_engine(uint32_t m10, int e10);
 
 #ifdef __SIZEOF_INT128__
 typedef __uint128_t _u128;
@@ -714,7 +730,7 @@ _u128_gt(_u128 a, _u128 b)
 }
 
 long double
-__atold_engine(_u128 m10, int e10);
+__why_atold_engine(_u128 m10, int e10);
 
 static inline __ungetc_t
 __non_atomic_exchange_ungetc(__ungetc_t *p, __ungetc_t v)

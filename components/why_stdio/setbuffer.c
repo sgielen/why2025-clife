@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 void
-setbuffer(FILE *stream, char *buf, size_t size)
+why_setbuffer(FILE *stream, char *buf, size_t size)
 {
-        setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
+        why_setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
 }

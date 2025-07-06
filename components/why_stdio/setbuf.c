@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 void
-setbuf(FILE *stream, char *buf)
+why_setbuf(FILE *stream, char *buf)
 {
-        setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
+        why_setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
 }

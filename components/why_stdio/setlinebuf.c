@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 void
-setlinebuf(FILE *stream)
+why_setlinebuf(FILE *stream)
 {
-        setvbuf(stream, NULL, _IOLBF, 0);
+        why_setvbuf(stream, NULL, _IOLBF, 0);
 }

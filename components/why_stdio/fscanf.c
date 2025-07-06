@@ -32,13 +32,13 @@
 #include "stdio_private.h"
 
 int
-fscanf(FILE *stream, const char *fmt, ...)
+why_fscanf(FILE *stream, const char *fmt, ...)
 {
 	va_list ap;
 	int i;
 
 	va_start(ap, fmt);
-	i = vfscanf(stream, fmt, ap);
+	i = why_vfscanf(stream, fmt, ap);
 	va_end(ap);
 
 	return i;

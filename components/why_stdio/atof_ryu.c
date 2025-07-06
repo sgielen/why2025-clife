@@ -62,7 +62,7 @@ static inline float int32Bits2Float(uint32_t bits) {
 }
 
 float
-__atof_engine(uint32_t m10, int e10)
+__why_atof_engine(uint32_t m10, int e10)
 {
 #ifdef RYU_DEBUG
 	printf("m10digits = %ld\n", m10);
