@@ -231,7 +231,7 @@ int why_open(const char *pathname, int flags, mode_t mode) {
     int fd = -1;
 
     for (int i = 0; i < MAXFD; ++i) {
-        if (task_info->file_handles[fd].is_open == false) {
+        if (task_info->file_handles[i].is_open == false) {
             fd = i;
             break;
         }
