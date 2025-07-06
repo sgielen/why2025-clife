@@ -13,6 +13,8 @@
 
 #define MAXFD 128
 
+extern uintptr_t elf_find_sym(const char *sym_name);
+
 static const char *TAG = "elf_loader";
 
 extern const uint8_t test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
@@ -284,6 +286,9 @@ void run_elf(void *buffer) {
 }
 
 int app_main(void) {
+    // TODO Bit of a hack to prevent elf_find_sym from being removed.
+    elf_find_sym("strdup");
+
     process_table = kh_init(ptable);
     TaskHandle_t elf_a, elf_b;
     printf("Hello ESP32P4 firmware\n");

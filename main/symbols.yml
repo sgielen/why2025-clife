@@ -1,0 +1,101 @@
+---
+include:
+  - time.h
+  - sys/time.h
+  - string.h
+  - stdlib.h
+  - stdio.h
+  - unistd.h
+  - getopt.h
+  - setjmp.h
+  - ctype.h
+
+simple_function:
+  - _ctype_
+  - strerror
+  - memset
+  - memcpy
+  - memmove
+  - strlen
+  - strtod
+  - strrchr
+  - strchr
+  - strcmp
+  - strtol
+  - strcspn
+  - strncat
+  - strcasecmp
+  - strcpy
+  - strncpy
+  - strtok
+  - sscanf
+  - usleep
+  - sleep
+  - exit
+  - close
+  - snprintf
+  - dprintf
+  - sprintf
+  - snprintf
+  - vprintf
+  - vdprintf
+  - vsprintf
+  - vsnprintf
+  - clock_gettime
+  - strftime
+  - gettimeofday
+  - getopt_long
+  - optind
+  - opterr
+  - optarg
+  - optopt
+  - longjmp
+  - setjmp
+
+simple_function_extern:
+  - __ltdf2
+  - __fixunsdfsi
+  - __gtdf2
+  - __floatunsidf
+  - __divdf3
+
+simple_object:
+  - __errno
+
+wrapped_function:
+  - malloc
+  - free
+  - calloc
+  - realloc
+  - reallocarray
+  - open
+  - close
+  - fseek
+  - fseeko
+  - fflush
+  - write
+  - read
+  - lseek
+  - printf
+  - puts
+  - fopen
+  - fclose
+  - fdopen
+  - fprintf
+  - fgetc
+  - fgets
+  - strdup
+  - strndup
+  - isatty
+  - getenv
+  - atexit
+  - tcgetattr
+  - tcsetattr
+  - fputs
+  - fputc
+  - fileno
+
+wrapped_object:
+  - stdin
+  - stdout
+  - stderr

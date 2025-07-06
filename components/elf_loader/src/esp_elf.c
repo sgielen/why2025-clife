@@ -17,8 +17,10 @@
 #include "hal/cache_ll.h"
 #endif
 
-#include "private/elf_symbol.h"
+//#include "private/elf_symbol.h"
 #include "private/elf_platform.h"
+
+extern uintptr_t elf_find_sym(const char *sym_name);
 
 #define stype(_s, _t)               ((_s)->type == (_t))
 #define sflags(_s, _f)              (((_s)->flags & (_f)) == (_f))

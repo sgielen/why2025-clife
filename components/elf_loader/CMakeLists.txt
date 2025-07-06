@@ -1,8 +1,7 @@
 
 if(CONFIG_ELF_LOADER)
-    set(srcs  "src/esp_elf_symbol.c"
-              "src/esp_elf.c"
-              "src/esp_elf_adapter.c")
+    set(srcs "src/esp_elf.c"
+             "src/esp_elf_adapter.c")
 
     if(CONFIG_ELF_LOADER_CUSTOMER_SYMBOLS)
         list(APPEND srcs "src/esp_all_symbol.c")
