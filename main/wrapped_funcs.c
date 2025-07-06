@@ -95,37 +95,65 @@ int why_atexit(void (*function)(void)) {
 }
 
 void *why_malloc(size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_malloc", "Calling malloc from task %p with size %zi", task_info->handle, size);
+    void *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+    task_record_resource_alloc(RES_MALLOC, ptr);
+    return ptr;
+}
 
-    return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+void *why_calloc(size_t nmemb, size_t size) {
+    void *ptr = heap_caps_calloc(nmemb, size, MALLOC_CAP_SPIRAM);
+    task_record_resource_alloc(RES_MALLOC, ptr);
+    return ptr;
+}
+
+void *why_realloc(void *_Nullable ptr, size_t size) {
+    void *new_ptr = heap_caps_realloc(ptr, size, MALLOC_CAP_SPIRAM);
+    if (new_ptr != ptr) {
+        if (ptr) {
+            task_record_resource_free(RES_MALLOC, ptr);
+        }
+        task_record_resource_alloc(RES_MALLOC, new_ptr);
+    }
+    return new_ptr;
+}
+
+void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
+    void *new_ptr = heap_caps_realloc(ptr, nmemb * size, MALLOC_CAP_SPIRAM);
+    if (new_ptr != ptr) {
+        if (ptr) {
+            task_record_resource_free(RES_MALLOC, ptr);
+        }
+        task_record_resource_alloc(RES_MALLOC, new_ptr);
+    }
+    return new_ptr;
+}
+
+void why_free(void *_Nullable ptr) {
+    if (ptr) {
+        task_record_resource_free(RES_MALLOC, ptr);
+    }
+    heap_caps_free(ptr);
 }
 
 iconv_t why_iconv_open(const char *tocode, const char *fromcode) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_iconv_open", "Calling iconv_open from task %p", task_info->handle);
-
-    return iconv_open(tocode, fromcode);
+    iconv_t res = iconv_open(tocode, fromcode);
+    task_record_resource_alloc(RES_ICONV_OPEN, res);
+    return res;
 }
 
 int why_iconv_close(iconv_t cd) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_iconv_close", "Calling iconv_close from task %p", task_info->handle);
-
+    task_record_resource_free(RES_ICONV_OPEN, cd);
     return iconv_close(cd);
 }
 
 int why_regcomp(regex_t *restrict preg, const char *restrict regex, int cflags) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_regcomp", "Calling regcomp from task %p", task_info->handle);
-
-    return regcomp(preg, regex, cflags);
+    int res = regcomp(preg, regex, cflags);
+    task_record_resource_alloc(RES_REGCOMP, preg);
+    return res;
 }
 
 void why_regfree(regex_t *preg) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_regfree", "Calling regfree from task %p", task_info->handle);
-
+    task_record_resource_free(RES_REGCOMP, preg);
     return regfree(preg);
 }
 
@@ -138,47 +166,21 @@ int why_tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
 }
 
 wchar_t *why_wcsdup(const wchar_t *s) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_wcsdup", "Calling wcsdup from task %p", task_info->handle);
-
-    return wcsdup(s);
+    wchar_t *ptr = wcsdup(s);
+    task_record_resource_alloc(RES_MALLOC, ptr);
+    return ptr;
 }
 
 char *why_strdup(const char *s) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_strdup", "Calling strdup from task %p", task_info->handle);
-
-    return strdup(s);
+    char *ptr = strdup(s);
+    task_record_resource_alloc(RES_MALLOC, ptr);
+    return ptr;
 }
 
 char *why_strndup(const char *s, size_t n) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_strndup", "Calling strndup from task %p", task_info->handle);
-    return strndup(s, n);
-}
-
-void why_free(void *_Nullable ptr) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_free", "Calling free from task %p", task_info->handle);
-    heap_caps_free(ptr);
-}
-
-void *why_calloc(size_t nmemb, size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_calloc", "Calling calloc from task %p", task_info->handle);
-    return calloc(nmemb, size);
-}
-
-void *why_realloc(void *_Nullable ptr, size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_realloc", "Calling realloc from task %p", task_info->handle);
-    return realloc(ptr, size);
-}
-
-void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_reallocarray", "Calling reallocarray from task %p", task_info->handle);
-    return reallocarray(ptr, nmemb, size);
+    char *ptr = strndup(s, n);
+    task_record_resource_alloc(RES_MALLOC, ptr);
+    return ptr;
 }
 
 ssize_t why_write(int fd, const void *buf, size_t count) {
@@ -219,23 +221,6 @@ off_t why_lseek(int fd, off_t offset, int whence) {
     return 0;
 }
 
-int why_close(int fd) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_close", "Calling close from task %p", task_info->handle);
-
-    if (fd > MAXFD) goto out;
-
-    if (task_info->file_handles[fd].is_open) {
-        free(task_info->file_handles[fd].file);
-        memset(&task_info->file_handles[fd], 0, sizeof(file_handle_t));
-        return 0;
-    }
-
-out:
-    task_info->_errno = EBADF;
-    return -1;
-}
-
 int why_puts(const char *str) {
     return puts(str);
 }
@@ -273,3 +258,21 @@ out:
     ESP_LOGI("why_open", "Calling open from task %p for path %s returning %i", task_info->handle, pathname, fd);
     return fd;
 }
+
+int why_close(int fd) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_close", "Calling close from task %p", task_info->handle);
+
+    if (fd > MAXFD) goto out;
+
+    if (task_info->file_handles[fd].is_open) {
+        free(task_info->file_handles[fd].file);
+        memset(&task_info->file_handles[fd], 0, sizeof(file_handle_t));
+        return 0;
+    }
+
+out:
+    task_info->_errno = EBADF;
+    return -1;
+}
+

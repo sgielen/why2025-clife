@@ -2,9 +2,13 @@
 #include <stdatomic.h>
 
 #include "task.h"
+#include "khash.h"
 
 #include "esp_log.h"
 #include "esp_elf.h"
+
+#include <iconv.h>
+#include <regex.h>
 
 // Hack to prevent elf_find_sym being deleted from our project
 extern uintptr_t elf_find_sym(const char *sym_name);
@@ -35,25 +39,18 @@ void process_table_add_task(task_info_t* task_info) {
     xSemaphoreGive(process_table_lock);
 }
 
+// Must be called under lock!
 void process_table_remove_task(task_info_t* task_info) {
-    if (xSemaphoreTake(process_table_lock, portMAX_DELAY) != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to get process table mutex");
-        abort();
-    }
-
     khint_t k = kh_get(ptable, process_table, (uintptr_t)task_info->handle);
     if (k != kh_end(process_table)) {
         kh_del(ptable, process_table, k);
     } else {
         ESP_LOGE(TAG, "Attempted to remove non-existant program from process table");
     }
-
-    xSemaphoreGive(process_table_lock);
 }
 
 static void task_killed(int idx, void* ti) {
     // We cannot do any logging or locking here.
-    
     task_info_t *task_info = ti;
     task_info->killed = true;
     atomic_flag_clear(&everything_clean);
@@ -77,13 +74,79 @@ void task_info_init() {
     task_info->file_handles[2].is_open = true;
     task_info->file_handles[2].is_stderr = true;
 
+    for (int i = 0; i < RES_RESOURCE_TYPE_MAX; ++i) {
+        task_info->resources[i] = kh_init(restable);
+    }
+
     process_table_add_task(task_info);
     vTaskSetThreadLocalStoragePointerAndDelCallback(handle, 0, task_info, task_killed);
 }
 
 void task_info_delete(task_info_t* task_info) {
+    ESP_LOGI(TAG, "Deleting task_info %p", task_info);
+
+    for (int i = 0; i < RES_RESOURCE_TYPE_MAX; ++i) {
+        for (khiter_t k = kh_begin(task_info->resources[i]); k != kh_end(task_info->resources[i]); ++k) {
+            if (kh_exist(task_info->resources[i], k)) {
+                void *ptr = (void*)kh_key(task_info->resources[i], k);
+                enum task_resource_type type = kh_value(task_info->resources[i], k);
+
+                switch (type) {
+                    case RES_MALLOC:
+                        ESP_LOGI(TAG, "Cleaning up malloc %p", ptr);
+                        heap_caps_free(ptr);
+                        break;
+                    case RES_ICONV_OPEN:
+                        ESP_LOGI(TAG, "Cleaning up iconv %p", ptr);
+                        iconv_close(ptr);
+                        break;
+                    case RES_REGCOMP:
+                        ESP_LOGI(TAG, "Cleaning up regcomp %p", ptr);
+                        regfree(ptr);
+                        break;
+                    case RES_OPEN:
+                        // Nothing to do here, handled later
+                        break;
+                    default:
+                        ESP_LOGE(TAG, "Unknown resource type %i in task_info_delete", type);
+                }
+            }
+        }
+
+        kh_destroy(restable, task_info->resources[i]);
+    }
     free(task_info->term);
     free(task_info);
+}
+
+void task_record_resource_alloc(enum task_resource_type type, void *ptr) {
+    task_info_t *task_info = get_task_info();
+
+    int r;
+    khint_t k = kh_get(restable, task_info->resources[type], (uintptr_t)ptr);
+    if (k == kh_end(task_info->resources[type])) {
+        k = kh_put(restable, task_info->resources[type], (uintptr_t)ptr, &r);
+        if (r >= 0) {
+            kh_value(task_info->resources[type], k) = type;
+        } else {
+            ESP_LOGE(TAG, "Unable to track resource %p", ptr);
+            abort();
+        }
+    } else {
+        ESP_LOGE(TAG, "Attempted allocate already allocated resource %p", ptr);
+    }
+
+}
+
+void task_record_resource_free(enum task_resource_type type, void *ptr) {
+    task_info_t *task_info = get_task_info();
+
+    khint_t k = kh_get(restable, task_info->resources[type], (uintptr_t)ptr);
+    if (k != kh_end(task_info->resources[type])) {
+        kh_del(restable, task_info->resources[type], k);
+    } else {
+        ESP_LOGE(TAG, "Attempted to free already freed resource %p", ptr);
+    }
 }
 
 void run_elf(void *buffer) {
@@ -138,9 +201,13 @@ void cleanup_thread(void *ignored) {
                     if (kh_exist(process_table, k)) {
                         task_info_t *task_info = kh_value(process_table, k);
                         if (task_info->killed) {
-                            ESP_LOGI(TAG, "Deleting killed task %p", task_info->handle);
+                            void *ptr = task_info->handle;
+                            ESP_LOGI(TAG, "Deleting killed task %p", ptr);
+                            // We are under lock
+                            process_table_remove_task(task_info);
                             kh_del(ptable, process_table, k);
                             task_info_delete(task_info);
+                            ESP_LOGI(TAG, "Killed task %p deleted", ptr);
                         }
                     }
                 }

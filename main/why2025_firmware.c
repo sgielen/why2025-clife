@@ -23,13 +23,15 @@ int app_main(void) {
     TaskHandle_t elf_a, elf_b;
     printf("Hello ESP32P4 firmware\n");
 
-    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a); 
-//    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
+    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a); 
+//    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a); 
+    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 
 
     while(1) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     };
+
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Suspending worker task A\n");
     vTaskSuspend(elf_a);
