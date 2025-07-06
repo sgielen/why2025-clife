@@ -20,3 +20,4 @@ add_custom_target(generated_symbols
 )
 
 add_dependencies(${COMPONENT_LIB} generated_symbols)
+target_link_libraries(${COMPONENT_LIB} PRIVATE m g)
