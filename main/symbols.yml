@@ -892,6 +892,7 @@ wrapped_function:
   - ferror
   - fflush
   - fgetc
+  - fgetpos
   - fgets
   - fileno
   - fopen
@@ -939,7 +940,6 @@ wrapped_function:
   - vfscanf
   - wcsdup
   - write
-  - fgetpos
 
 wrapped_object:
   - stdin
