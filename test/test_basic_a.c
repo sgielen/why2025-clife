@@ -46,7 +46,6 @@ int main(int argc, char *argv[]) {
         printf("Read: %zi bytes\n", r);
         x[r] = '\0';
         printf("String: %s\n", x);
-        fclose(f);
     }
 	return 0;
 }
