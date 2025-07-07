@@ -301,8 +301,9 @@ int why_close(int fd) {
     if (fd > MAXFD) goto out;
 
     if (task_info->file_handles[fd].device->_close) {
+        int ret = task_info->file_handles[fd].device->_close(task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd);
         memset(&task_info->file_handles[fd], 0, sizeof(file_handle_t));
-        return task_info->file_handles[fd].device->_close(task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd);
+        return ret;
     } else {
         ESP_LOGE("why_read", "fd %i has no valid close function", fd);
     }

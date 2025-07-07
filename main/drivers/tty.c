@@ -60,7 +60,7 @@ device_t *tty_create(bool is_stdout, bool is_stdin) {
     dev->device._read = tty_read;
     dev->device._lseek = tty_lseek;
     dev->is_stdout = is_stdout;
-    dev->is_stdout = is_stdin;
+    dev->is_stdin = is_stdin;
 
     return (device_t*)dev;
 }
