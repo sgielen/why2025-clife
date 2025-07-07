@@ -1,5 +1,7 @@
 #include <string.h>
 #include <stdatomic.h>
+#include <iconv.h>
+#include <regex.h>
 
 #include "task.h"
 #include "khash.h"
@@ -7,8 +9,7 @@
 #include "esp_log.h"
 #include "esp_elf.h"
 
-#include <iconv.h>
-#include <regex.h>
+#include "hash_helper.h"
 
 // Hack to prevent elf_find_sym being deleted from our project
 extern uintptr_t elf_find_sym(const char *sym_name);
@@ -30,23 +31,14 @@ void process_table_add_task(task_info_t* task_info) {
         abort();
     }
 
-    int r;
-    khint_t k = kh_put(ptable, process_table, (uintptr_t)task_info->handle, &r);
-    if (r >= 0) {
-        kh_value(process_table, k) = task_info;
-    }
+    khash_insert_ptr(ptable, process_table, task_info->handle, task_info, "task_info");
 
     xSemaphoreGive(process_table_lock);
 }
 
 // Must be called under lock!
 void process_table_remove_task(task_info_t* task_info) {
-    khint_t k = kh_get(ptable, process_table, (uintptr_t)task_info->handle);
-    if (k != kh_end(process_table)) {
-        kh_del(ptable, process_table, k);
-    } else {
-        ESP_LOGE(TAG, "Attempted to remove non-existant program from process table");
-    }
+    khash_del_ptr(ptable, process_table, task_info->handle, "Attempted to remove non-existant program from process table");
 }
 
 static void task_killed(int idx, void* ti) {
@@ -122,31 +114,13 @@ void task_info_delete(task_info_t* task_info) {
 void task_record_resource_alloc(enum task_resource_type type, void *ptr) {
     task_info_t *task_info = get_task_info();
 
-    int r;
-    khint_t k = kh_get(restable, task_info->resources[type], (uintptr_t)ptr);
-    if (k == kh_end(task_info->resources[type])) {
-        k = kh_put(restable, task_info->resources[type], (uintptr_t)ptr, &r);
-        if (r >= 0) {
-            kh_value(task_info->resources[type], k) = type;
-        } else {
-            ESP_LOGE(TAG, "Unable to track resource %p", ptr);
-            abort();
-        }
-    } else {
-        ESP_LOGE(TAG, "Attempted allocate already allocated resource %p", ptr);
-    }
-
+    khash_insert_unique_ptr(restable, task_info->resources[type], ptr, type, "Attempted allocate already allocated resource");
 }
 
 void task_record_resource_free(enum task_resource_type type, void *ptr) {
     task_info_t *task_info = get_task_info();
 
-    khint_t k = kh_get(restable, task_info->resources[type], (uintptr_t)ptr);
-    if (k != kh_end(task_info->resources[type])) {
-        kh_del(restable, task_info->resources[type], k);
-    } else {
-        ESP_LOGE(TAG, "Attempted to free already freed resource %p", ptr);
-    }
+    khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
 }
 
 void run_elf(void *buffer) {
@@ -220,7 +194,7 @@ void cleanup_thread(void *ignored) {
 }
 
 void task_init() {
-    ESP_LOGI(TAG, "Initializing tasking");
+    ESP_LOGI(TAG, "Initializing");
 
     // TODO hack
     uintptr_t x = elf_find_sym("strdup");
