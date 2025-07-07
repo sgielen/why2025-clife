@@ -24,8 +24,8 @@ int app_main(void) {
     device_init();
     task_init();
 
-    device_register("TT01:", tty_create(true, true));
-    device_register("FLASH0:", fatfs_create_spi("FLASH0", "storage", true));
+    device_register("TT01", tty_create(true, true));
+    device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
 
     TaskHandle_t elf_a, elf_b;
     printf("Hello ESP32P4 firmware\n");

@@ -245,7 +245,7 @@ char *get_device_from_path(const char *pathname) {
 
     for (size_t i = 0; i < size; ++i) {
         if (device[i] == ':') {
-            device[i + 1] = 0;
+            device[i] = 0;
             return device;
         }
     }
@@ -305,7 +305,7 @@ int why_close(int fd) {
         memset(&task_info->file_handles[fd], 0, sizeof(file_handle_t));
         return ret;
     } else {
-        ESP_LOGE("why_read", "fd %i has no valid close function", fd);
+        ESP_LOGE("why_close", "fd %i has no valid close function", fd);
     }
 
 out:
