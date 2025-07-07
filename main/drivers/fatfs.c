@@ -29,6 +29,8 @@ char *vms_path_to_unix(fatfs_device_t *device, const char *path) {
 
         if (c == ':') {
             if (path[i + 1] == '[') {
+                ++i;
+                unixpath[o++] = '/';
                 in_path = true;
             } else {
                 in_file = true;

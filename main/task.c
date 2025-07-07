@@ -107,6 +107,17 @@ void task_info_delete(task_info_t* task_info) {
 
         kh_destroy(restable, task_info->resources[i]);
     }
+
+    for (int i = 0; i < MAXFD; ++i) {
+        // We sadly can't reuse the why_close code as it must be ran from inside the user task
+        if (task_info->file_handles[i].is_open) {
+            ESP_LOGI(TAG, "Cleaning up open filehandle %i", i);
+            if (task_info->file_handles[i].device->_close) {
+                task_info->file_handles[i].device->_close(task_info->file_handles[i].device, task_info->file_handles[i].dev_fd);
+            }
+        }
+    }
+
     free(task_info->term);
     free(task_info);
 }
@@ -157,7 +168,7 @@ void run_elf(void *buffer) {
 task_info_t *get_task_info() {
     task_info_t *task_info = pvTaskGetThreadLocalStoragePointer(NULL, 0);
 
-    ESP_LOGD("get_task_info", "Got process_handle %p == %p\n", task_info->handle, task_info);
+    ESP_LOGD("get_task_info", "Got process_handle %p == %p", task_info->handle, task_info);
 
     return task_info;
 }
