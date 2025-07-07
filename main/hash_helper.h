@@ -1,3 +1,14 @@
+#define khash_get_str(_type, _val, _table_type, _table_ptr, _key, _error) \
+    _type _val = 0; \
+    do { \
+        khint_t k = kh_get(_table_type, _table_ptr, _key); \
+        if (k == kh_end(_table_ptr)) { \
+            ESP_LOGE(TAG, _error " %s", _key); \
+        } else { \
+            _val = (_type)kh_val(_table_ptr, k); \
+        } \
+    } while(0);
+
 #define khash_insert_unique_str(_table_type, _table_ptr, _key, _value, _error) \
     do { \
         int r; \
@@ -35,6 +46,18 @@
             kh_del(_table_type, _table_ptr, k); \
         } else { \
             ESP_LOGE(TAG, _error ": %s", _key); \
+        } \
+    } while(0);
+
+
+#define khash_get_ptr(_type, _val, _table_type, _table_ptr, _key, _error) \
+    _type _val = 0; \
+    do { \
+        khint_t k = kh_get(_table_type, _table_ptr, (uintptr_t)_key); \
+        if (k == kh_end(_table_ptr)) { \
+            ESP_LOGE(TAG, _error " %p", _key); \
+        } else { \
+            _val = (_type)kh_val(_table_ptr, k); \
         } \
     } while(0);
 

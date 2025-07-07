@@ -44,7 +44,7 @@ idf_component_register( SRCS
   fputs.c
   #fputwc.c
   #fputws.c
-  #fread.c
+  fread.c
   #freopen.c
   fscanf.c
   fseek.c

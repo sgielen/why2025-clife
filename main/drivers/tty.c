@@ -1,0 +1,66 @@
+#include <stdbool.h>
+#include <stdio.h>
+
+#include "freertos/FreeRTOS.h"
+#include "rom/uart.h"
+#include "tty.h"
+
+typedef struct {
+    device_t device;
+    bool is_stdout;
+    bool is_stdin;
+} tty_device_t;
+
+int tty_open(void *dev, const char *path, int flags, mode_t mode) {
+    return 0;
+}
+
+int tty_close(void *dev, int fd) {
+    return 0;
+}
+
+ssize_t tty_write(void *dev, int fd, const void *buf, size_t count) {
+    tty_device_t *device = dev;
+    if (device->is_stdout) {
+        for (size_t i = 0; i < count; ++i) {
+            putchar(((const char*)buf)[i]);
+        }
+        return count;
+    }
+
+    return 0;
+}
+
+ssize_t tty_read(void *dev, int fd, const void *buf, size_t count) {
+    tty_device_t *device = dev;
+
+    if (device->is_stdin) {
+        uint8_t c;
+        while (1) {
+            ETS_STATUS s = uart_rx_one_char(&c);
+            if (s == ETS_OK) break;
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+        }
+        ((char*)buf)[0] = c;
+        return 1;
+    }
+
+    return 0;
+}
+
+ssize_t tty_lseek(void *dev, int fd, off_t offset, int whence) {
+    return (off_t) -1;
+}
+
+device_t *tty_create(bool is_stdout, bool is_stdin) {
+    tty_device_t *dev = malloc(sizeof(tty_device_t));
+    dev->device._open = tty_open;
+    dev->device._close = tty_close;
+    dev->device._write = tty_write;
+    dev->device._read = tty_read;
+    dev->device._lseek = tty_lseek;
+    dev->is_stdout = is_stdout;
+    dev->is_stdout = is_stdin;
+
+    return (device_t*)dev;
+}

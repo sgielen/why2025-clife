@@ -3,6 +3,8 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+#include "device.h"
 #include "khash.h"
 
 KHASH_MAP_INIT_INT(ptable, void*);
@@ -22,11 +24,9 @@ enum task_resource_type {
 };
 
 typedef struct {
-   bool is_open : 1;
-   bool is_stdin : 1;
-   bool is_stdout : 1;
-   bool is_stderr : 1;
-   char* file;
+    bool is_open;
+    int dev_fd;
+    device_t *device;
 } file_handle_t;
 
 typedef struct {

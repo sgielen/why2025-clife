@@ -39,7 +39,7 @@ extern FILE *const stdin __weak;
 extern FILE *const stdout __weak;
 
 size_t
-fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+why_fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t i, j;
 	uint8_t *cp = (uint8_t *) ptr;
@@ -119,7 +119,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 #endif
 	for (i = 0; i < nmemb; i++)
 		for (j = 0; j < size; j++) {
-			c = getc_unlocked(stream);
+			c = why_getc_unlocked(stream);
 			if (c == EOF)
 				__funlock_return(stream, i);
 			*cp++ = (uint8_t)c;

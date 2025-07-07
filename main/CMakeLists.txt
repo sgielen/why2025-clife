@@ -4,6 +4,9 @@ idf_component_register(
 	 "khash.h"
 	 "task.c"
 	 "wrapped_funcs.c"
+	 "device.c"
+	 "drivers/tty.c"
+	 "drivers/fatfs.c"
 	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
     INCLUDE_DIRS "." 
     EMBED_FILES "${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf" "${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf" "${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
@@ -26,3 +29,6 @@ add_custom_target(generated_symbols
 
 add_dependencies(${COMPONENT_LIB} generated_symbols)
 target_link_libraries(${COMPONENT_LIB} PRIVATE m g)
+
+set(image ../fatfs_image)
+fatfs_create_spiflash_image(storage ${image} FLASH_IN_PROJECT PRESERVE_TIME)

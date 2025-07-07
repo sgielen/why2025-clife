@@ -4,7 +4,10 @@
 #include "freertos/task.h"
 
 #include "esp_log.h"
-#include "rom/uart.h"
+
+#include "device.h"
+#include "drivers/tty.h"
+#include "drivers/fatfs.h"
 
 #include "task.h"
 
@@ -18,14 +21,18 @@ extern const uint8_t test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern const uint8_t test_elf_shell_end[] asm("_binary_test_shell_elf_end");
 
 int app_main(void) {
+    device_init();
     task_init();
+
+    device_register("TT01:", tty_create(true, true));
+    device_register("FLASH0:", fatfs_create_spi("FLASH0", "storage", true));
 
     TaskHandle_t elf_a, elf_b;
     printf("Hello ESP32P4 firmware\n");
 
     xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a); 
 //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a); 
-    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
+//    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 
 
     while(1) {

@@ -85,6 +85,9 @@ extern void why_setlinebuf(FILE *stream);
 extern long why_ftell(FILE *stream);
 extern __off_t why_ftello(FILE *stream);
 
+extern int why_getc(FILE *stream);
+extern int why_getc_unlocked(FILE *stream);
+
 #ifdef WIDE_CHARS
 # define CHAR wchar_t
 #else

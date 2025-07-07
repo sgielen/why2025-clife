@@ -899,6 +899,7 @@ wrapped_function:
   - fprintf
   - fputc
   - fputs
+  - fread
   - free
   - fscanf
   - fseek

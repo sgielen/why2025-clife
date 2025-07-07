@@ -60,11 +60,11 @@ void task_info_init() {
     task_info->current_files = 3;
     task_info->handle = handle;
     task_info->file_handles[0].is_open = true;
-    task_info->file_handles[0].is_stdin = true;
+    task_info->file_handles[0].device = device_get("TT01:");
     task_info->file_handles[1].is_open = true;
-    task_info->file_handles[1].is_stdout = true;
+    task_info->file_handles[1].device = device_get("TT01:");
     task_info->file_handles[2].is_open = true;
-    task_info->file_handles[2].is_stderr = true;
+    task_info->file_handles[2].device = device_get("TT01:");
 
     for (int i = 0; i < RES_RESOURCE_TYPE_MAX; ++i) {
         task_info->resources[i] = kh_init(restable);
