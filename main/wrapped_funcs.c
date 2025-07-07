@@ -96,13 +96,17 @@ int why_atexit(void (*function)(void)) {
 
 void *why_malloc(size_t size) {
     void *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-    task_record_resource_alloc(RES_MALLOC, ptr);
+    if (ptr) {
+        task_record_resource_alloc(RES_MALLOC, ptr);
+    }
     return ptr;
 }
 
 void *why_calloc(size_t nmemb, size_t size) {
     void *ptr = heap_caps_calloc(nmemb, size, MALLOC_CAP_SPIRAM);
-    task_record_resource_alloc(RES_MALLOC, ptr);
+    if (ptr) {
+        task_record_resource_alloc(RES_MALLOC, ptr);
+    }
     return ptr;
 }
 
@@ -112,7 +116,9 @@ void *why_realloc(void *_Nullable ptr, size_t size) {
         if (ptr) {
             task_record_resource_free(RES_MALLOC, ptr);
         }
-        task_record_resource_alloc(RES_MALLOC, new_ptr);
+        if (new_ptr) {
+            task_record_resource_alloc(RES_MALLOC, new_ptr);
+        }
     }
     return new_ptr;
 }
@@ -123,7 +129,9 @@ void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
         if (ptr) {
             task_record_resource_free(RES_MALLOC, ptr);
         }
-        task_record_resource_alloc(RES_MALLOC, new_ptr);
+        if (new_ptr) {
+            task_record_resource_alloc(RES_MALLOC, new_ptr);
+        }
     }
     return new_ptr;
 }
@@ -137,7 +145,9 @@ void why_free(void *_Nullable ptr) {
 
 iconv_t why_iconv_open(const char *tocode, const char *fromcode) {
     iconv_t res = iconv_open(tocode, fromcode);
-    task_record_resource_alloc(RES_ICONV_OPEN, res);
+    if (res != (iconv_t) -1) {
+        task_record_resource_alloc(RES_ICONV_OPEN, res);
+    }
     return res;
 }
 
@@ -148,7 +158,9 @@ int why_iconv_close(iconv_t cd) {
 
 int why_regcomp(regex_t *restrict preg, const char *restrict regex, int cflags) {
     int res = regcomp(preg, regex, cflags);
-    task_record_resource_alloc(RES_REGCOMP, preg);
+    if (res == 0) {
+        task_record_resource_alloc(RES_REGCOMP, preg);
+    }
     return res;
 }
 
@@ -167,19 +179,25 @@ int why_tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
 
 wchar_t *why_wcsdup(const wchar_t *s) {
     wchar_t *ptr = wcsdup(s);
-    task_record_resource_alloc(RES_MALLOC, ptr);
+    if (ptr) {
+        task_record_resource_alloc(RES_MALLOC, ptr);
+    }
     return ptr;
 }
 
 char *why_strdup(const char *s) {
     char *ptr = strdup(s);
-    task_record_resource_alloc(RES_MALLOC, ptr);
+    if (ptr) {
+        task_record_resource_alloc(RES_MALLOC, ptr);
+    }
     return ptr;
 }
 
 char *why_strndup(const char *s, size_t n) {
     char *ptr = strndup(s, n);
-    task_record_resource_alloc(RES_MALLOC, ptr);
+    if (ptr) {
+        task_record_resource_alloc(RES_MALLOC, ptr);
+    }
     return ptr;
 }
 
