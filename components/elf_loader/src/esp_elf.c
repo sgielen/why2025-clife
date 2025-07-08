@@ -517,8 +517,8 @@ void esp_elf_deinit(esp_elf_t *elf)
     }
 #else
     if (elf->psegment) {
-        esp_elf_free(elf->ptext);
-        elf->ptext = NULL;
+        esp_elf_free(elf->psegment);
+        elf->psegment = NULL;
     }
 #endif
 
