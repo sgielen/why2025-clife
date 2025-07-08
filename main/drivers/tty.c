@@ -11,7 +11,7 @@ typedef struct {
     bool is_stdin;
 } tty_device_t;
 
-int tty_open(void *dev, const char *path, int flags, mode_t mode) {
+int tty_open(void *dev, path_t *path, int flags, mode_t mode) {
     return 0;
 }
 

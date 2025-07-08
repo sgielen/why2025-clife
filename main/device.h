@@ -4,13 +4,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "pathfuncs.h"
 #include "khash.h"
 
 KHASH_MAP_INIT_STR(devtable, void*);
 extern khash_t(devtable) *device_table;
 
 typedef struct device_s {
-    int     (*_open)(void *dev, const char *path, int flags, mode_t mode);
+    int     (*_open)(void *dev, path_t *path, int flags, mode_t mode);
     int     (*_close)(void *dev, int fd);
     ssize_t (*_write)(void *dev, int fd, const void *buf, size_t count);
     ssize_t (*_read)(void *dev, int fd, const void *buf, size_t count);

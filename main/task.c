@@ -22,23 +22,61 @@ static atomic_flag everything_clean = ATOMIC_FLAG_INIT;
 
 static const char *TAG = "task";
 
-khash_t(ptable) *process_table;
+// Tracks free PIDs. Note that free PIDs are marked as 1, not 0!
+static uint32_t pid_free_bitmap[NUM_PIDS / 32];
+SemaphoreHandle_t pid_free_bitmap_lock = NULL;
+
+// Process table, each process gets a PID, which we track here.
+static task_info_t *process_table[NUM_PIDS];
 SemaphoreHandle_t process_table_lock = NULL;
 
-void process_table_add_task(task_info_t* task_info) {
+why_pid_t allocate_pid() {
+    if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to get pid table mutex");
+        abort();
+    }
+
+    why_pid_t pid = 0;
+
+    for (int i = 0; i < sizeof(pid_free_bitmap) / 4; ++i) {
+        int idx = __builtin_ffs(pid_free_bitmap[i]);
+        if (!idx) continue; // this bitmap is full
+
+        pid = i * 32 + (idx - 1);  // ffs is 1-based
+        pid_free_bitmap[i] &= ~(1U << (idx - 1));
+        break;
+    }
+
+    xSemaphoreGive(pid_free_bitmap_lock);
+    return pid;
+}
+
+void free_pid(why_pid_t pid) {
+    if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to get pid table mutex");
+        abort();
+    }
+
+    uint32_t word_idx = pid / 32;
+    uint32_t bit_idx = pid % 32;
+    pid_free_bitmap[word_idx] &= ~(1U << bit_idx);
+
+    xSemaphoreGive(pid_free_bitmap_lock);
+}
+
+void process_table_add_task(why_pid_t pid, task_info_t* task_info) {
     if (xSemaphoreTake(process_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get process table mutex");
         abort();
     }
 
-    khash_insert_ptr(ptable, process_table, task_info->handle, task_info, "task_info");
-
+    process_table[pid] = task_info;
     xSemaphoreGive(process_table_lock);
 }
 
 // Must be called under lock!
 void process_table_remove_task(task_info_t* task_info) {
-    khash_del_ptr(ptable, process_table, task_info->handle, "Attempted to remove non-existant program from process table");
+    process_table[task_info->pid] = NULL;
 }
 
 static void task_killed(int idx, void* ti) {
@@ -48,7 +86,7 @@ static void task_killed(int idx, void* ti) {
     atomic_flag_clear(&everything_clean);
 }
 
-void task_info_init() {
+task_info_t *task_info_init() {
     TaskHandle_t handle = xTaskGetCurrentTaskHandle();
     task_info_t *task_info = malloc(sizeof(task_info_t));
 
@@ -70,18 +108,29 @@ void task_info_init() {
         task_info->resources[i] = kh_init(restable);
     }
 
-    process_table_add_task(task_info);
     vTaskSetThreadLocalStoragePointerAndDelCallback(handle, 0, task_info, task_killed);
+
+    return task_info;
 }
 
 void task_info_delete(task_info_t* task_info) {
     ESP_LOGI(TAG, "Deleting task_info %p", task_info);
 
+    for (int i = 0; i < MAXFD; ++i) {
+        // We sadly can't reuse the why_close code as it must be ran from inside the user task
+        if (task_info->file_handles[i].is_open) {
+            ESP_LOGI(TAG, "Cleaning up open filehandle %i", i);
+            if (task_info->file_handles[i].device->_close) {
+                task_info->file_handles[i].device->_close(task_info->file_handles[i].device, task_info->file_handles[i].dev_fd);
+            }
+        }
+    }
+
     for (int i = 0; i < RES_RESOURCE_TYPE_MAX; ++i) {
         for (khiter_t k = kh_begin(task_info->resources[i]); k != kh_end(task_info->resources[i]); ++k) {
             if (kh_exist(task_info->resources[i], k)) {
                 void *ptr = (void*)kh_key(task_info->resources[i], k);
-                enum task_resource_type type = kh_value(task_info->resources[i], k);
+                task_resource_type_t type = kh_value(task_info->resources[i], k);
 
                 switch (type) {
                     case RES_MALLOC:
@@ -97,7 +146,7 @@ void task_info_delete(task_info_t* task_info) {
                         regfree(ptr);
                         break;
                     case RES_OPEN:
-                        // Nothing to do here, handled later
+                        // Already handled above
                         break;
                     default:
                         ESP_LOGE(TAG, "Unknown resource type %i in task_info_delete", type);
@@ -108,40 +157,25 @@ void task_info_delete(task_info_t* task_info) {
         kh_destroy(restable, task_info->resources[i]);
     }
 
-    for (int i = 0; i < MAXFD; ++i) {
-        // We sadly can't reuse the why_close code as it must be ran from inside the user task
-        if (task_info->file_handles[i].is_open) {
-            ESP_LOGI(TAG, "Cleaning up open filehandle %i", i);
-            if (task_info->file_handles[i].device->_close) {
-                task_info->file_handles[i].device->_close(task_info->file_handles[i].device, task_info->file_handles[i].dev_fd);
-            }
-        }
-    }
-
     free(task_info->term);
     free(task_info);
 }
 
-void task_record_resource_alloc(enum task_resource_type type, void *ptr) {
+void task_record_resource_alloc(task_resource_type_t type, void *ptr) {
     task_info_t *task_info = get_task_info();
 
     khash_insert_unique_ptr(restable, task_info->resources[type], ptr, type, "Attempted allocate already allocated resource");
 }
 
-void task_record_resource_free(enum task_resource_type type, void *ptr) {
+void task_record_resource_free(task_resource_type_t type, void *ptr) {
     task_info_t *task_info = get_task_info();
 
     khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
 }
 
-void run_elf(void *buffer) {
-    int argc = 0;
-    char **argv = NULL;
-    int ret;
-
+void elf_task(task_parameters_t* p) {
     esp_elf_t elf;
-
-    task_info_init();
+    int ret;
 
     ret = esp_elf_init(&elf);
     if (ret < 0) {
@@ -149,20 +183,66 @@ void run_elf(void *buffer) {
         return;
     }
 
-    ret = esp_elf_relocate(&elf, (const uint8_t*)buffer);
+    ret = esp_elf_relocate(&elf, (const uint8_t*)p->buffer);
     if (ret < 0) {
         ESP_LOGE(TAG, "Failed to relocate ELF file errno=%d", ret);
-        return;
+        goto out;
+    }
+
+    if (! p->buffer_in_rom) {
+        free(p->buffer);
     }
 
     ESP_LOGI(TAG, "Start ELF file entrypoint");
 
-    esp_elf_request(&elf, 0, argc, argv);
+    esp_elf_request(&elf, 0, p->argc, p->argv);
 
     ESP_LOGI(TAG, "Successfully exited from ELF file");
 
+out:
     esp_elf_deinit(&elf);
+}
+
+void generic_task(void* tp) {
+    task_parameters_t *p = tp;
+    task_info_t *task_info = task_info_init();
+    process_table_add_task(p->pid, task_info);
+    p->task_entry(p);
     vTaskDelete(NULL);
+}
+
+why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]) {
+    why_pid_t pid = allocate_pid();
+    if (!pid) {
+        ESP_LOGW(TAG, "Cannot allocate PID for new task");
+        return -1;
+    }
+
+    task_parameters_t *parameters = malloc(sizeof(task_parameters_t));
+    parameters->pid = pid;
+    parameters->buffer = buffer;
+    parameters->buffer_in_rom = false;
+    parameters->argc = argc;
+    parameters->argv = argv;
+
+    switch (type) {
+        case TASK_TYPE_ELF:
+            parameters->task_entry = elf_task;
+        break;
+        case TASK_TYPE_ELF_ROM:
+            parameters->task_entry = elf_task;
+            parameters->buffer_in_rom = true; 
+        break;
+        default:
+            ESP_LOGE(TAG, "Unknown task type %i", type);
+            return -1;
+    }
+
+    // "Task " + "255" + \0
+    char task_name[5 + 3 + 1];
+    sprintf(task_name, "Task %i", (uint8_t)pid);
+    xTaskCreate(generic_task, task_name, stack_size, (void*)parameters, 5, NULL);
+    return pid;
 }
 
 task_info_t *get_task_info() {
@@ -182,18 +262,15 @@ void cleanup_thread(void *ignored) {
             }
 
             do {
-                for (khiter_t k = kh_begin(process_table); k != kh_end(process_table); ++k) {
-                    if (kh_exist(process_table, k)) {
-                        task_info_t *task_info = kh_value(process_table, k);
-                        if (task_info->killed) {
-                            void *ptr = task_info->handle;
-                            ESP_LOGI(TAG, "Deleting killed task %p", ptr);
-                            // We are under lock
-                            process_table_remove_task(task_info);
-                            kh_del(ptable, process_table, k);
-                            task_info_delete(task_info);
-                            ESP_LOGI(TAG, "Killed task %p deleted", ptr);
-                        }
+                // Skip pid 0
+                for (int i = 1; i < NUM_PIDS; ++i) {
+                    task_info_t *task_info = process_table[i];
+                    if (task_info && task_info->killed) {
+                        ESP_LOGI(TAG, "Deleting killed task %i", task_info->pid);
+                        // We are under lock
+                        process_table_remove_task(task_info);
+                        task_info_delete(task_info);
+                        ESP_LOGI(TAG, "Killed task %i deleted", task_info->pid);
                     }
                 }
             } while (! atomic_flag_test_and_set(&everything_clean));
@@ -207,11 +284,18 @@ void cleanup_thread(void *ignored) {
 void task_init() {
     ESP_LOGI(TAG, "Initializing");
 
+    // If you hit this assertion change the allocation for the task name to match the new size
+    assert(NUM_PIDS == 256);
     // TODO hack
     uintptr_t x = elf_find_sym("strdup");
     (void)x;
 
-    process_table = kh_init(ptable);
+    pid_free_bitmap_lock = xSemaphoreCreateMutex();
+    memset(pid_free_bitmap, 0xFF, sizeof(pid_free_bitmap));
+    pid_free_bitmap[0] = UINT32_MAX - 1; // PID 0 is the kernel
+
     process_table_lock = xSemaphoreCreateMutex();
+    memset(process_table, 0, sizeof(process_table));
+
     xTaskCreate(cleanup_thread, "Task Cleanup Thread", 2048, NULL, 10, NULL);
 }

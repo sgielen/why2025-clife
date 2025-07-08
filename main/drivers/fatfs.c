@@ -14,56 +14,11 @@ typedef struct {
     char *base_path;
 } fatfs_device_t;
 
-char *vms_path_to_unix(fatfs_device_t *device, const char *path) {
-    size_t len = strlen(path);
-    // VMS paths can be a little shorter than unix paths
-    // DEVICE:FILE is shorter than /DEVICE/FILE by 1
-    char *unixpath = calloc(len + 2, 1);
-    strcpy(unixpath, device->base_path);
-    size_t o = strlen(device->base_path);
-
-    bool in_path = false;
-    bool in_file = false;
-    for (size_t i = 0; i < len; ++i) {
-        char c = path[i];
-
-        if (c == ':') {
-            if (path[i + 1] == '[') {
-                ++i;
-                unixpath[o++] = '/';
-                in_path = true;
-            } else {
-                in_file = true;
-                unixpath[o++] = '/';
-            }
-            continue;
-        }
-
-        if (in_path) {
-            if (c == '.') c = '/';
-            if (c == ']') {
-                in_path = false;
-                in_file = true;
-                unixpath[o++] = '/';
-                continue;
-            } 
-        }
-
-        if (in_path || in_file) unixpath[o++] = c;
-    }
-
-    unixpath[o++] = '\0';
-    printf("vms_path_to_unix: %s == %s\n", path, unixpath);
-    return unixpath;
-}
-
-int fatfs_open(void *dev, const char *path, int flags, mode_t mode) {
+int fatfs_open(void *dev, path_t *path, int flags, mode_t mode) {
     fatfs_device_t *device = dev;
-    char *unixpath = vms_path_to_unix(device, path);
+    char *unixpath = path_to_unix(path);
 
     int ret = open(unixpath, flags, mode);
-    free(unixpath);
-
     return ret;
 }
 

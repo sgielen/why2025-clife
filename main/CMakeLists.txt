@@ -5,6 +5,7 @@ idf_component_register(
 	 "task.c"
 	 "wrapped_funcs.c"
 	 "device.c"
+	 "pathfuncs.c"
 	 "drivers/tty.c"
 	 "drivers/fatfs.c"
 	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c

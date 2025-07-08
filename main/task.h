@@ -10,18 +10,27 @@
 KHASH_MAP_INIT_INT(ptable, void*);
 KHASH_MAP_INIT_INT(restable, int);
 
-extern khash_t(ptable) *process_table;
-
 #define MAXFD 128
 #define STRERROR_BUFLEN 128
+#define NUM_PIDS 256
+#define MAX_PID 255
 
-enum task_resource_type {
+// 255 pids, but we want negative numbers for error conditions
+#define PID_T_TYPE int16_t
+typedef PID_T_TYPE why_pid_t;
+
+typedef enum {
     RES_MALLOC,
     RES_ICONV_OPEN,
     RES_REGCOMP,
     RES_OPEN,
     RES_RESOURCE_TYPE_MAX
-};
+} task_resource_type_t;
+
+typedef enum {
+    TASK_TYPE_ELF,
+    TASK_TYPE_ELF_ROM,
+} task_type_t;
 
 typedef struct {
     bool is_open;
@@ -29,9 +38,20 @@ typedef struct {
     device_t *device;
 } file_handle_t;
 
+typedef struct task_parameters {
+    why_pid_t pid;
+    char *buffer;
+    bool buffer_in_rom;
+    int argc;
+    char **argv;
+    void (*task_entry)(struct task_parameters *parameters);
+} task_parameters_t;
+
 typedef struct {
+    why_pid_t pid;
     bool killed;
     TaskHandle_t handle;
+    task_parameters_t *task_parameters;
     khash_t(restable) *resources[RES_RESOURCE_TYPE_MAX];
 
     size_t max_memory;
@@ -51,9 +71,8 @@ typedef struct {
     struct tm localtime_tm;
 } task_info_t;
 
-
 void task_init();
 task_info_t *get_task_info();
-void run_elf(void *buffer);
-void task_record_resource_alloc(enum task_resource_type type, void *ptr);
-void task_record_resource_free(enum task_resource_type type, void *ptr);
+why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
+void task_record_resource_alloc(task_resource_type_t type, void *ptr);
+void task_record_resource_free(task_resource_type_t type, void *ptr);

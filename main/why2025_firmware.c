@@ -27,18 +27,25 @@ int app_main(void) {
     device_register("TT01", tty_create(true, true));
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
 
-    TaskHandle_t elf_a, elf_b;
     printf("Hello ESP32P4 firmware\n");
 
-    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a); 
+//    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a); 
+    why_pid_t pida = run_task(test_elf_a_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
+    ESP_LOGI(TAG, "Started task with pid %i", pida);
+    why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
+    ESP_LOGI(TAG, "Started task with pid %i", pidb);
 //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a); 
 //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 
 
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
     while(1) {
+        fprintf(stderr, ".");
+        fflush(stderr);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     };
 
+#if 0 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Suspending worker task A\n");
     vTaskSuspend(elf_a);
@@ -58,6 +65,7 @@ int app_main(void) {
     printf("Sleeping for a bit\n");
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Bye cruel workd!\n");
+#endif
 
     return 0;
 }

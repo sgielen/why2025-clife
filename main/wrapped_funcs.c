@@ -12,6 +12,7 @@
 #include "rom/uart.h"
 
 #include "task.h"
+#include "pathfuncs.h"
 
 static const char *TAG = "wrapped_functions";
 
@@ -239,34 +240,25 @@ int why_puts(const char *str) {
     return puts(str);
 }
 
-char *get_device_from_path(const char *pathname) {
-    size_t size = strlen(pathname);
-    char *device = strdup(pathname);
-
-    for (size_t i = 0; i < size; ++i) {
-        if (device[i] == ':') {
-            device[i] = 0;
-            return device;
-        }
-    }
-
-    free(device);
-    return NULL;
-}
-
 int why_open(const char *pathname, int flags, mode_t mode) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("why_open", "Calling open from task %p for path %s", task_info->handle, pathname);
     int fd = -1;
 
-    char *devicename = get_device_from_path(pathname);
-    device_t *device = device_get(devicename);
+    path_t parsed_path;
+    int res = parse_path(pathname, &parsed_path);
+    if (res) {
+        task_info->_errno = EFAULT;
+        goto out;
+    }
+
+    device_t *device = device_get(parsed_path.device);
     if (!device) {
         task_info->_errno = EFAULT;
         goto out;
     }
 
-    int dev_fd = device->_open(device, pathname, flags, mode);
+    int dev_fd = device->_open(device, &parsed_path, flags, mode);
     if (dev_fd < 0) {
         task_info->_errno = EFAULT;
         goto out;
@@ -290,7 +282,7 @@ int why_open(const char *pathname, int flags, mode_t mode) {
 
 out:
     ESP_LOGI("why_open", "Calling open from task %p for path %s returning %i", task_info->handle, pathname, fd);
-    free(devicename);
+    path_free(&parsed_path);
     return fd;
 }
 
