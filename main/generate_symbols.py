@@ -34,6 +34,7 @@ int symbol_compare(const void *a, const void *b) {{
     return strcmp(sym_a->name, sym_b->name);
 }}
 
+__attribute__((used))
 uintptr_t elf_find_sym(const char *sym_name) {{
     struct esp_elfsym key = {{ .name = sym_name }};
     const struct esp_elfsym *res;
@@ -72,6 +73,8 @@ if __name__ == '__main__':
     if len(sys.argv) != 3:
         print(f"Usage: {argv[0]} symbol_file.yml output_source.c")
         exit(1)
+
+    print("Generating symbols...")
 
     seen_symbols = []
 
@@ -124,4 +127,6 @@ if __name__ == '__main__':
             definitions = "\n".join(symbol_definitions),
             symbols = ",\n".join(symbols))
         )
+
+    print(f"Generated list of {len(seen_symbols)} symbols")
   

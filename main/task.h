@@ -13,10 +13,10 @@ KHASH_MAP_INIT_INT(restable, int);
 
 #define MAXFD           128
 #define STRERROR_BUFLEN 128
-#define NUM_PIDS        256
-#define MAX_PID         255
+#define NUM_PIDS        128
+#define MAX_PID         127
 
-// 255 pids, but we want negative numbers for error conditions
+// We want negative numbers for error conditions
 #define PID_T_TYPE int16_t
 typedef PID_T_TYPE why_pid_t;
 
@@ -33,21 +33,20 @@ typedef struct {
     device_t *device;
 } file_handle_t;
 
-typedef struct task_parameters {
-    why_pid_t pid;
-    char     *buffer;
-    bool      buffer_in_rom;
-    int       argc;
-    char    **argv;
-    void (*task_entry)(struct task_parameters *parameters);
-} task_parameters_t;
-
-typedef struct {
-    why_pid_t          pid;
-    atomic_bool        killed;
-    TaskHandle_t       handle;
-    task_parameters_t *task_parameters;
+typedef struct task_info {
+    why_pid_t    pid;
+    TaskHandle_t handle;
     khash_t(restable) * resources[RES_RESOURCE_TYPE_MAX];
+
+    void       *data;
+    task_type_t type;
+    char       *buffer;
+    bool        buffer_in_rom;
+    int         argc;
+    char      **argv;
+    char      **argv_back;
+    size_t      argv_size;
+    void (*task_entry)(struct task_info *task_info);
 
     size_t        max_memory;
     size_t        current_memory;

@@ -43,4 +43,5 @@ endfunction()
 
 build_test_elf(test_basic_a test_basic_a.c)
 build_test_elf(test_basic_b test_basic_b.c)
+build_test_elf(test_basic_c test_basic_c.c)
 build_test_elf(test_shell shell.c)

@@ -1,5 +1,6 @@
 idf_component_register(
     SRCS
+	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
     	 "why2025_firmware.c"
 	 "khash.h"
 	 "task.c"
@@ -8,9 +9,12 @@ idf_component_register(
 	 "pathfuncs.c"
 	 "drivers/tty.c"
 	 "drivers/fatfs.c"
-	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
     INCLUDE_DIRS "." 
-    EMBED_FILES "${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf" "${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf" "${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
+    EMBED_FILES 
+    	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
 )
 
 add_custom_command(

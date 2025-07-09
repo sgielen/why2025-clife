@@ -1,12 +1,14 @@
 #include "device.h"
 #include "drivers/fatfs.h"
 #include "drivers/tty.h"
+#include "elf_symbols.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "task.h"
 
 #include <string.h>
+static void const *__keep_symbol __attribute__((used)) = &elf_find_sym;
 
 static char const *TAG = "why2025_main";
 
@@ -14,6 +16,8 @@ extern uint8_t const test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
 extern uint8_t const test_elf_a_end[] asm("_binary_test_basic_a_elf_end");
 extern uint8_t const test_elf_b_start[] asm("_binary_test_basic_b_elf_start");
 extern uint8_t const test_elf_b_end[] asm("_binary_test_basic_b_elf_end");
+extern uint8_t const test_elf_c_start[] asm("_binary_test_basic_c_elf_start");
+extern uint8_t const test_elf_c_end[] asm("_binary_test_basic_c_elf_end");
 extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
 
@@ -27,8 +31,17 @@ int app_main(void) {
     printf("Hello ESP32P4 firmware\n");
 
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a);
-    why_pid_t pida = run_task(test_elf_a_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
-    ESP_LOGI(TAG, "Started task with pid %i", pida);
+
+    char **argv = malloc(sizeof(char *) * 2);
+    argv[0]     = strdup("test_elf_c");
+    argv[1]     = strdup("argv[xxx]");
+
+    for (int i = 1; i < 270; ++i) {
+        sprintf(argv[1], "argv[%d]", i);
+        why_pid_t pida = run_task(test_elf_c_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+        ESP_LOGI(TAG, "Started task with pid %i", pida);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
     // why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a);

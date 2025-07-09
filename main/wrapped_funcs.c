@@ -16,6 +16,18 @@
 
 static char const *TAG = "wrapped_functions";
 
+#define validate_user_pointer(ptr, _ret)                                                                               \
+    do {                                                                                                               \
+        task_info_t *task_info = get_task_info();                                                                      \
+        if (unlikely(                                                                                                  \
+                (uintptr_t)ptr >= (uintptr_t)task_info->argv &&                                                        \
+                (uintptr_t)ptr < ((uintptr_t)task_info->argv) + task_info->argv_size                                   \
+            )) {                                                                                                       \
+            ESP_LOGE(TAG, "PID %d Attempted to manipulate argv allocation", task_info->pid);                           \
+            return _ret;                                                                                               \
+        }                                                                                                              \
+    } while (0);
+
 char *why_strerror(int errnum) {
     task_info_t *task_info = get_task_info();
     return strerror_r(errnum, task_info->strerror_buf, STRERROR_BUFLEN);
@@ -97,7 +109,7 @@ int why_atexit(void (*function)(void)) {
 
 void *why_malloc(size_t size) {
     void *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-    if (ptr) {
+    if (likely(ptr)) {
         task_record_resource_alloc(RES_MALLOC, ptr);
     }
     return ptr;
@@ -105,19 +117,21 @@ void *why_malloc(size_t size) {
 
 void *why_calloc(size_t nmemb, size_t size) {
     void *ptr = heap_caps_calloc(nmemb, size, MALLOC_CAP_SPIRAM);
-    if (ptr) {
+    if (likely(ptr)) {
         task_record_resource_alloc(RES_MALLOC, ptr);
     }
     return ptr;
 }
 
 void *why_realloc(void *_Nullable ptr, size_t size) {
+    validate_user_pointer(ptr, NULL);
+
     void *new_ptr = heap_caps_realloc(ptr, size, MALLOC_CAP_SPIRAM);
-    if (new_ptr != ptr) {
-        if (ptr) {
+    if (likely(new_ptr != ptr)) {
+        if (likely(ptr)) {
             task_record_resource_free(RES_MALLOC, ptr);
         }
-        if (new_ptr) {
+        if (likely(new_ptr)) {
             task_record_resource_alloc(RES_MALLOC, new_ptr);
         }
     }
@@ -125,12 +139,14 @@ void *why_realloc(void *_Nullable ptr, size_t size) {
 }
 
 void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
+    validate_user_pointer(ptr, NULL);
+
     void *new_ptr = heap_caps_realloc(ptr, nmemb * size, MALLOC_CAP_SPIRAM);
-    if (new_ptr != ptr) {
-        if (ptr) {
+    if (likely(new_ptr != ptr)) {
+        if (likely(ptr)) {
             task_record_resource_free(RES_MALLOC, ptr);
         }
-        if (new_ptr) {
+        if (likely(new_ptr)) {
             task_record_resource_alloc(RES_MALLOC, new_ptr);
         }
     }
@@ -138,7 +154,9 @@ void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
 }
 
 void why_free(void *_Nullable ptr) {
-    if (ptr) {
+    validate_user_pointer(ptr, );
+
+    if (likely(ptr)) {
         task_record_resource_free(RES_MALLOC, ptr);
     }
     heap_caps_free(ptr);
@@ -146,13 +164,14 @@ void why_free(void *_Nullable ptr) {
 
 iconv_t why_iconv_open(char const *tocode, char const *fromcode) {
     iconv_t res = iconv_open(tocode, fromcode);
-    if (res != (iconv_t)-1) {
+    if (likely(res != (iconv_t)-1)) {
         task_record_resource_alloc(RES_ICONV_OPEN, res);
     }
     return res;
 }
 
 int why_iconv_close(iconv_t cd) {
+    validate_user_pointer(cd, -1);
     task_record_resource_free(RES_ICONV_OPEN, cd);
     return iconv_close(cd);
 }
@@ -166,6 +185,7 @@ int why_regcomp(regex_t *restrict preg, char const *restrict regex, int cflags) 
 }
 
 void why_regfree(regex_t *preg) {
+    validate_user_pointer(preg, );
     task_record_resource_free(RES_REGCOMP, preg);
     return regfree(preg);
 }
@@ -180,7 +200,7 @@ int why_tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
 
 wchar_t *why_wcsdup(wchar_t const *s) {
     wchar_t *ptr = wcsdup(s);
-    if (ptr) {
+    if (likely(ptr)) {
         task_record_resource_alloc(RES_MALLOC, ptr);
     }
     return ptr;
@@ -188,7 +208,7 @@ wchar_t *why_wcsdup(wchar_t const *s) {
 
 char *why_strdup(char const *s) {
     char *ptr = strdup(s);
-    if (ptr) {
+    if (likely(ptr)) {
         task_record_resource_alloc(RES_MALLOC, ptr);
     }
     return ptr;
@@ -196,7 +216,7 @@ char *why_strdup(char const *s) {
 
 char *why_strndup(char const *s, size_t n) {
     char *ptr = strndup(s, n);
-    if (ptr) {
+    if (likely(ptr)) {
         task_record_resource_alloc(RES_MALLOC, ptr);
     }
     return ptr;
