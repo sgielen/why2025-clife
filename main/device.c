@@ -1,16 +1,15 @@
 #include "device.h"
 
-#include "freertos/FreeRTOS.h"
-
-#include "hash_helper.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "hash_helper.h"
 
-static const char *TAG = "device";
+static char const *TAG = "device";
 
-khash_t(devtable) *device_table;
+khash_t(devtable) * device_table;
 SemaphoreHandle_t device_table_lock = NULL;
 
-int device_register(const char *name, device_t *device) {
+int device_register(char const *name, device_t *device) {
     if (xSemaphoreTake(device_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get device table mutex");
         abort();
@@ -23,13 +22,13 @@ int device_register(const char *name, device_t *device) {
     return 0;
 }
 
-device_t* device_get(const char *name) {
+device_t *device_get(char const *name) {
     if (xSemaphoreTake(device_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get device table mutex");
         abort();
     }
 
-    khash_get_str(device_t*, device, devtable, device_table, name, "The device does not exist");
+    khash_get_str(device_t *, device, devtable, device_table, name, "The device does not exist");
 
     xSemaphoreGive(device_table_lock);
 
@@ -39,7 +38,6 @@ device_t* device_get(const char *name) {
 void device_init() {
     ESP_LOGI(TAG, "Initializing");
 
-    device_table = kh_init(devtable);
+    device_table      = kh_init(devtable);
     device_table_lock = xSemaphoreCreateMutex();
 }
-

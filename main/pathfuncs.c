@@ -1,18 +1,19 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-
 #include "pathfuncs.h"
 
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <string.h>
+
 // Parse a path in the form of DEVICE:[DIR.SUBDIR]FILENAME.EXT
-path_parse_result_t parse_path(const char *path, path_t *result) {
-    result->buffer = NULL;
-    result->device = NULL;
+path_parse_result_t parse_path(char const *path, path_t *result) {
+    result->buffer    = NULL;
+    result->device    = NULL;
     result->directory = NULL;
-    result->filename = NULL;
-    result->unixpath = NULL;
-    result->len = strlen(path);
+    result->filename  = NULL;
+    result->unixpath  = NULL;
+    result->len       = strlen(path);
 
     if (!path || !*path) {
         return PATH_PARSE_EMPTY_PATH;
@@ -23,7 +24,7 @@ path_parse_result_t parse_path(const char *path, path_t *result) {
         return PATH_PARSE_EMPTY_PATH;
     }
 
-    char *p = result->buffer;
+    char *p     = result->buffer;
     char *start = p;
 
     // Everything up to the ':' is the device part
@@ -42,13 +43,13 @@ path_parse_result_t parse_path(const char *path, path_t *result) {
         return PATH_PARSE_EMPTY_DEVICE;
     }
 
-    *p = '\0';
+    *p             = '\0';
     result->device = start;
-    p++;            // Skip ':'
+    p++; // Skip ':'
 
     // Directory comes next [dir.name]
     if (*p == '[') {
-        p++;        // Skip '['
+        p++; // Skip '['
         start = p;
 
         // Find closing ']'
@@ -64,11 +65,11 @@ path_parse_result_t parse_path(const char *path, path_t *result) {
         }
 
         if (p > start) {
-            *p = '\0';
+            *p                = '\0';
             result->directory = start;
         }
 
-        p++;        // Skip ']'
+        p++; // Skip ']'
     }
 
     if (*p != '\0') {
@@ -91,10 +92,10 @@ char *path_to_unix(path_t *path) {
     }
 
     // Most unix paths are shorter than BadgeVMS paths except for directory-less paths.
-    char *unixpath = malloc(path->len + 3);
-    size_t device_len = strlen(path->device);
+    char  *unixpath      = malloc(path->len + 3);
+    size_t device_len    = strlen(path->device);
     size_t directory_len = 0;
-    size_t filename_len = 0;
+    size_t filename_len  = 0;
 
     if (path->directory) {
         directory_len = strlen(path->directory);
@@ -104,16 +105,17 @@ char *path_to_unix(path_t *path) {
         filename_len = strlen(path->filename);
     }
 
-    size_t o = 0;
+    size_t o      = 0;
     unixpath[o++] = '/';
     memcpy(&unixpath[o], path->device, device_len);
-    o += device_len;
-    unixpath[o++] = '/';
+    o             += device_len;
+    unixpath[o++]  = '/';
 
     if (directory_len) {
         for (size_t i = 0; i < directory_len; ++i) {
             char c = path->directory[i];
-            if (c == '.') c = '/';
+            if (c == '.')
+                c = '/';
             unixpath[o++] = c;
         }
         unixpath[o++] = '/';
@@ -124,7 +126,7 @@ char *path_to_unix(path_t *path) {
         o += filename_len;
     }
 
-    unixpath[o] = 0;
+    unixpath[o]    = 0;
     path->unixpath = unixpath;
     return unixpath;
 }

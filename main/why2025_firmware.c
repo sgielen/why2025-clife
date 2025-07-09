@@ -1,24 +1,21 @@
-#include <string.h>
-
+#include "device.h"
+#include "drivers/fatfs.h"
+#include "drivers/tty.h"
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
-#include "esp_log.h"
-
-#include "device.h"
-#include "drivers/tty.h"
-#include "drivers/fatfs.h"
-
 #include "task.h"
 
-static const char *TAG = "why2025_main";
+#include <string.h>
 
-extern const uint8_t test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
-extern const uint8_t test_elf_a_end[] asm("_binary_test_basic_a_elf_end");
-extern const uint8_t test_elf_b_start[] asm("_binary_test_basic_b_elf_start");
-extern const uint8_t test_elf_b_end[] asm("_binary_test_basic_b_elf_end");
-extern const uint8_t test_elf_shell_start[] asm("_binary_test_shell_elf_start");
-extern const uint8_t test_elf_shell_end[] asm("_binary_test_shell_elf_end");
+static char const *TAG = "why2025_main";
+
+extern uint8_t const test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
+extern uint8_t const test_elf_a_end[] asm("_binary_test_basic_a_elf_end");
+extern uint8_t const test_elf_b_start[] asm("_binary_test_basic_b_elf_start");
+extern uint8_t const test_elf_b_end[] asm("_binary_test_basic_b_elf_end");
+extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
+extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
 
 int app_main(void) {
     device_init();
@@ -29,17 +26,17 @@ int app_main(void) {
 
     printf("Hello ESP32P4 firmware\n");
 
-//    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a); 
+    //    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a);
     why_pid_t pida = run_task(test_elf_a_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     ESP_LOGI(TAG, "Started task with pid %i", pida);
-    //why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
-    //ESP_LOGI(TAG, "Started task with pid %i", pidb);
-//    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a); 
-//    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
+    // why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
+    // ESP_LOGI(TAG, "Started task with pid %i", pidb);
+    //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a);
+    //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b);
 
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
-    while(1) {
+    while (1) {
         fprintf(stderr, ".");
         fflush(stderr);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
