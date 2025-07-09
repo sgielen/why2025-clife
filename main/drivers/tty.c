@@ -11,15 +11,15 @@ typedef struct {
     bool is_stdin;
 } tty_device_t;
 
-int tty_open(void *dev, path_t *path, int flags, mode_t mode) {
+static int tty_open(void *dev, path_t *path, int flags, mode_t mode) {
     return 0;
 }
 
-int tty_close(void *dev, int fd) {
+static int tty_close(void *dev, int fd) {
     return 0;
 }
 
-ssize_t tty_write(void *dev, int fd, const void *buf, size_t count) {
+static ssize_t tty_write(void *dev, int fd, const void *buf, size_t count) {
     tty_device_t *device = dev;
     if (device->is_stdout) {
         for (size_t i = 0; i < count; ++i) {
@@ -31,7 +31,7 @@ ssize_t tty_write(void *dev, int fd, const void *buf, size_t count) {
     return 0;
 }
 
-ssize_t tty_read(void *dev, int fd, const void *buf, size_t count) {
+static ssize_t tty_read(void *dev, int fd, const void *buf, size_t count) {
     tty_device_t *device = dev;
 
     if (device->is_stdin) {
@@ -48,7 +48,7 @@ ssize_t tty_read(void *dev, int fd, const void *buf, size_t count) {
     return 0;
 }
 
-ssize_t tty_lseek(void *dev, int fd, off_t offset, int whence) {
+static ssize_t tty_lseek(void *dev, int fd, off_t offset, int whence) {
     return (off_t) -1;
 }
 

@@ -14,7 +14,7 @@ typedef struct {
     char *base_path;
 } fatfs_device_t;
 
-int fatfs_open(void *dev, path_t *path, int flags, mode_t mode) {
+static int fatfs_open(void *dev, path_t *path, int flags, mode_t mode) {
     fatfs_device_t *device = dev;
     char *unixpath = path_to_unix(path);
 
@@ -22,19 +22,19 @@ int fatfs_open(void *dev, path_t *path, int flags, mode_t mode) {
     return ret;
 }
 
-int fatfs_close(void *dev, int fd) {
+static int fatfs_close(void *dev, int fd) {
     return close(fd);
 }
 
-ssize_t fatfs_write(void *dev, int fd, const void *buf, size_t count) {
+static ssize_t fatfs_write(void *dev, int fd, const void *buf, size_t count) {
     return write(fd, buf, count);
 }
 
-ssize_t fatfs_read(void *dev, int fd, const void *buf, size_t count) {
+static ssize_t fatfs_read(void *dev, int fd, const void *buf, size_t count) {
     return read(fd, buf, count);
 }
 
-ssize_t fatfs_lseek(void *dev, int fd, off_t offset, int whence) {
+static ssize_t fatfs_lseek(void *dev, int fd, off_t offset, int whence) {
     return lseek(fd, offset, whence);
 }
 

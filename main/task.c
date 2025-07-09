@@ -25,7 +25,7 @@ SemaphoreHandle_t process_table_lock = NULL;
 
 TaskHandle_t cleanup_task_handle;
 
-why_pid_t allocate_pid() {
+static why_pid_t pid_allocate() {
     if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get pid table mutex");
         abort();
@@ -46,20 +46,21 @@ why_pid_t allocate_pid() {
     return pid;
 }
 
-void free_pid(why_pid_t pid) {
+static void pid_free(why_pid_t pid) {
+    uint32_t word_idx = pid / 32;
+    uint32_t bit_idx = pid % 32;
+
     if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get pid table mutex");
         abort();
     }
 
-    uint32_t word_idx = pid / 32;
-    uint32_t bit_idx = pid % 32;
     pid_free_bitmap[word_idx] &= ~(1U << bit_idx);
 
     xSemaphoreGive(pid_free_bitmap_lock);
 }
 
-void process_table_add_task(task_info_t* task_info) {
+static void process_table_add_task(task_info_t* task_info) {
     if (xSemaphoreTake(process_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get process table mutex");
         abort();
@@ -70,7 +71,7 @@ void process_table_add_task(task_info_t* task_info) {
     xSemaphoreGive(process_table_lock);
 }
 
-void process_table_remove_task(task_info_t* task_info) {
+static void process_table_remove_task(task_info_t* task_info) {
     if (xSemaphoreTake(process_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get process table mutex");
         abort();
@@ -88,7 +89,7 @@ static void task_killed(int idx, void* ti) {
     xTaskNotifyGiveIndexed(cleanup_task_handle, 0);
 }
 
-task_info_t *task_info_init() {
+static task_info_t *task_info_init() {
     TaskHandle_t handle = xTaskGetCurrentTaskHandle();
     task_info_t *task_info = malloc(sizeof(task_info_t));
 
@@ -116,8 +117,8 @@ task_info_t *task_info_init() {
     return task_info;
 }
 
-void task_info_delete(task_info_t* task_info) {
-    ESP_LOGI(TAG, "Deleting task_info %p", task_info);
+static void task_info_delete(task_info_t* task_info) {
+    ESP_LOGI(TAG, "Deleting task_info %pi for pid %i", task_info, task_info->pid);
 
     for (int i = 0; i < MAXFD; ++i) {
         // We sadly can't reuse the why_close code as it must be ran from inside the user task
@@ -164,19 +165,7 @@ void task_info_delete(task_info_t* task_info) {
     free(task_info);
 }
 
-void task_record_resource_alloc(task_resource_type_t type, void *ptr) {
-    task_info_t *task_info = get_task_info();
-
-    khash_insert_unique_ptr(restable, task_info->resources[type], ptr, type, "Attempted allocate already allocated resource");
-}
-
-void task_record_resource_free(task_resource_type_t type, void *ptr) {
-    task_info_t *task_info = get_task_info();
-
-    khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
-}
-
-void elf_task(task_parameters_t* p) {
+static void elf_task(task_parameters_t* p) {
     esp_elf_t elf;
     int ret;
 
@@ -207,7 +196,7 @@ out:
 }
 
 // This is the function that runs inside the Task
-void generic_task(void* tp) {
+static void generic_task(void* tp) {
     task_parameters_t *p = tp;
     task_info_t *task_info = task_info_init();
     task_info->pid = p->pid;
@@ -216,8 +205,45 @@ void generic_task(void* tp) {
     vTaskDelete(NULL);
 }
 
+static void cleanup_task(void *ignored) {
+    while (1) {
+        // For each notification run once. There is most likely just one
+        // task to clean up. If there are more we'll just start over.
+        ulTaskNotifyTakeIndexed(0, pdFALSE, portMAX_DELAY);
+        ESP_LOGI(TAG, "Cleanup task woke up");
+        // Skip pid 0
+        for (int i = 1; i < NUM_PIDS; ++i) {
+            task_info_t *task_info = process_table[i];
+            if (task_info && atomic_load(&task_info->killed)) {
+                why_pid_t pid = task_info->pid;
+                ESP_LOGI(TAG, "Deleting killed task %i", pid);
+                // We are under lock.
+                process_table_remove_task(task_info);
+                task_info_delete(task_info);
+                pid_free(pid);
+                ESP_LOGI(TAG, "Killed task %i deleted", pid);
+                // There's probably only one task to clean up, stop iterating
+                // and drop the lock.
+                break;
+            }
+        }
+    }
+}
+
+void task_record_resource_alloc(task_resource_type_t type, void *ptr) {
+    task_info_t *task_info = get_task_info();
+
+    khash_insert_unique_ptr(restable, task_info->resources[type], ptr, type, "Attempted allocate already allocated resource");
+}
+
+void task_record_resource_free(task_resource_type_t type, void *ptr) {
+    task_info_t *task_info = get_task_info();
+
+    khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
+}
+
 why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]) {
-    why_pid_t pid = allocate_pid();
+    why_pid_t pid = pid_allocate();
     if (!pid) {
         ESP_LOGW(TAG, "Cannot allocate PID for new task");
         return -1;
@@ -258,29 +284,6 @@ task_info_t *get_task_info() {
     ESP_LOGD("get_task_info", "Got process_handle %p == %p", task_info->handle, task_info);
 
     return task_info;
-}
-
-void cleanup_task(void *ignored) {
-    while (1) {
-        // For each notification run once. There is most likely just one
-        // task to clean up. If there are more we'll just start over.
-        ulTaskNotifyTakeIndexed(0, pdFALSE, portMAX_DELAY);
-        ESP_LOGI(TAG, "Cleanup task woke up");
-        // Skip pid 0
-        for (int i = 1; i < NUM_PIDS; ++i) {
-            task_info_t *task_info = process_table[i];
-            if (task_info && atomic_load(&task_info->killed)) {
-                ESP_LOGI(TAG, "Deleting killed task %i", task_info->pid);
-                // We are under lock.
-                process_table_remove_task(task_info);
-                task_info_delete(task_info);
-                ESP_LOGI(TAG, "Killed task %i deleted", task_info->pid);
-                // There's probably only one task to clean up, stop iterating
-                // and drop the lock.
-                break;
-            }
-        }
-    }
 }
 
 void task_init() {
