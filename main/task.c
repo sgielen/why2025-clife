@@ -13,13 +13,6 @@
 
 // Hack to prevent elf_find_sym being deleted from our project
 extern uintptr_t elf_find_sym(const char *sym_name);
-
-// We are not allowed to block at all in the TLS cleanup callback
-// so we have a separate thread taking care of that.
-// we just check the status of the bool periodically to see if we should
-// clean anything up.
-static atomic_flag everything_clean = ATOMIC_FLAG_INIT;
-
 static const char *TAG = "task";
 
 // Tracks free PIDs. Note that free PIDs are marked as 1, not 0!
@@ -29,6 +22,8 @@ SemaphoreHandle_t pid_free_bitmap_lock = NULL;
 // Process table, each process gets a PID, which we track here.
 static task_info_t *process_table[NUM_PIDS];
 SemaphoreHandle_t process_table_lock = NULL;
+
+TaskHandle_t cleanup_task_handle;
 
 why_pid_t allocate_pid() {
     if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
@@ -64,26 +59,33 @@ void free_pid(why_pid_t pid) {
     xSemaphoreGive(pid_free_bitmap_lock);
 }
 
-void process_table_add_task(why_pid_t pid, task_info_t* task_info) {
+void process_table_add_task(task_info_t* task_info) {
     if (xSemaphoreTake(process_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get process table mutex");
         abort();
     }
 
-    process_table[pid] = task_info;
+    process_table[task_info->pid] = task_info;
+
     xSemaphoreGive(process_table_lock);
 }
 
-// Must be called under lock!
 void process_table_remove_task(task_info_t* task_info) {
+    if (xSemaphoreTake(process_table_lock, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to get process table mutex");
+        abort();
+    }
+
     process_table[task_info->pid] = NULL;
+
+    xSemaphoreGive(process_table_lock);
 }
 
 static void task_killed(int idx, void* ti) {
     // We cannot do any logging or locking here.
     task_info_t *task_info = ti;
-    task_info->killed = true;
-    atomic_flag_clear(&everything_clean);
+    atomic_store(&task_info->killed, true);
+    xTaskNotifyGiveIndexed(cleanup_task_handle, 0);
 }
 
 task_info_t *task_info_init() {
@@ -95,6 +97,7 @@ task_info_t *task_info_init() {
     memset(task_info, 0, sizeof(task_info_t));
 
     task_info->term = strdup("dumb");
+    task_info->killed = ATOMIC_VAR_INIT(false);
     task_info->current_files = 3;
     task_info->handle = handle;
     task_info->file_handles[0].is_open = true;
@@ -203,10 +206,12 @@ out:
     esp_elf_deinit(&elf);
 }
 
+// This is the function that runs inside the Task
 void generic_task(void* tp) {
     task_parameters_t *p = tp;
     task_info_t *task_info = task_info_init();
-    process_table_add_task(p->pid, task_info);
+    task_info->pid = p->pid;
+    process_table_add_task(task_info);
     p->task_entry(p);
     vTaskDelete(NULL);
 }
@@ -235,12 +240,14 @@ why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, cha
         break;
         default:
             ESP_LOGE(TAG, "Unknown task type %i", type);
+            free(parameters);
             return -1;
     }
 
     // "Task " + "255" + \0
     char task_name[5 + 3 + 1];
     sprintf(task_name, "Task %i", (uint8_t)pid);
+
     xTaskCreate(generic_task, task_name, stack_size, (void*)parameters, 5, NULL);
     return pid;
 }
@@ -253,31 +260,26 @@ task_info_t *get_task_info() {
     return task_info;
 }
 
-void cleanup_thread(void *ignored) {
+void cleanup_task(void *ignored) {
     while (1) {
-        if (! atomic_flag_test_and_set(&everything_clean)) {
-            if (xSemaphoreTake(process_table_lock, portMAX_DELAY) != pdTRUE) {
-                ESP_LOGE(TAG, "Failed to get process table mutex");
-                abort();
+        // For each notification run once. There is most likely just one
+        // task to clean up. If there are more we'll just start over.
+        ulTaskNotifyTakeIndexed(0, pdFALSE, portMAX_DELAY);
+        ESP_LOGI(TAG, "Cleanup task woke up");
+        // Skip pid 0
+        for (int i = 1; i < NUM_PIDS; ++i) {
+            task_info_t *task_info = process_table[i];
+            if (task_info && atomic_load(&task_info->killed)) {
+                ESP_LOGI(TAG, "Deleting killed task %i", task_info->pid);
+                // We are under lock.
+                process_table_remove_task(task_info);
+                task_info_delete(task_info);
+                ESP_LOGI(TAG, "Killed task %i deleted", task_info->pid);
+                // There's probably only one task to clean up, stop iterating
+                // and drop the lock.
+                break;
             }
-
-            do {
-                // Skip pid 0
-                for (int i = 1; i < NUM_PIDS; ++i) {
-                    task_info_t *task_info = process_table[i];
-                    if (task_info && task_info->killed) {
-                        ESP_LOGI(TAG, "Deleting killed task %i", task_info->pid);
-                        // We are under lock
-                        process_table_remove_task(task_info);
-                        task_info_delete(task_info);
-                        ESP_LOGI(TAG, "Killed task %i deleted", task_info->pid);
-                    }
-                }
-            } while (! atomic_flag_test_and_set(&everything_clean));
-
-            xSemaphoreGive(process_table_lock);
         }
-        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -297,5 +299,5 @@ void task_init() {
     process_table_lock = xSemaphoreCreateMutex();
     memset(process_table, 0, sizeof(process_table));
 
-    xTaskCreate(cleanup_thread, "Task Cleanup Thread", 2048, NULL, 10, NULL);
+    xTaskCreate(cleanup_task, "Task Cleanup Task", 2048, NULL, 10, &cleanup_task_handle);
 }

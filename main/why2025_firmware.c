@@ -32,8 +32,8 @@ int app_main(void) {
 //    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a); 
     why_pid_t pida = run_task(test_elf_a_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     ESP_LOGI(TAG, "Started task with pid %i", pida);
-    why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
-    ESP_LOGI(TAG, "Started task with pid %i", pidb);
+    //why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
+    //ESP_LOGI(TAG, "Started task with pid %i", pidb);
 //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a); 
 //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b); 
 

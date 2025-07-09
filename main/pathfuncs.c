@@ -133,4 +133,3 @@ void path_free(path_t *path) {
     free(path->buffer);
     free(path->unixpath);
 }
-

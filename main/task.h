@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <time.h> // For task_info_t
 
 #include "freertos/FreeRTOS.h"
@@ -49,7 +50,7 @@ typedef struct task_parameters {
 
 typedef struct {
     why_pid_t pid;
-    bool killed;
+    atomic_bool killed;
     TaskHandle_t handle;
     task_parameters_t *task_parameters;
     khash_t(restable) *resources[RES_RESOURCE_TYPE_MAX];
