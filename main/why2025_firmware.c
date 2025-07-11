@@ -7,6 +7,8 @@
 #include "freertos/task.h"
 #include "task.h"
 
+#include "logical_names.h"
+
 #include <string.h>
 static void const *__keep_symbol __attribute__((used)) = &elf_find_sym;
 

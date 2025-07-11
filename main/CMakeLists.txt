@@ -7,6 +7,7 @@ idf_component_register(
 	 "wrapped_funcs.c"
 	 "device.c"
 	 "pathfuncs.c"
+	 "logical_names.c"
 	 "drivers/tty.c"
 	 "drivers/fatfs.c"
     INCLUDE_DIRS "." 
