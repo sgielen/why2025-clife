@@ -5,9 +5,8 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "task.h"
-
 #include "logical_names.h"
+#include "task.h"
 
 #include <string.h>
 static void const *__keep_symbol __attribute__((used)) = &elf_find_sym;

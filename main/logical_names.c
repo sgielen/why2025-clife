@@ -1,55 +1,56 @@
 #ifndef ESP_LOGE
-#define ESP_LOGE(tag, ...) do { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); } while(0)
+#define ESP_LOGE(tag, ...)                                                                                             \
+    do {                                                                                                               \
+        fprintf(stderr, __VA_ARGS__);                                                                                  \
+        fprintf(stderr, "\n");                                                                                         \
+    } while (0)
 #endif
 
 #define TAG logical_names
 
-#include "khash.h"
-#include "hash_helper.h"
 #include "logical_names.h"
 
-#define MAX_DIR_DEPTH 25
+#include "hash_helper.h"
+#include "khash.h"
+
+#define MAX_DIR_DEPTH     25
 #define RESOLVE_MAX_DEPTH 15
 
 #include <stdio.h>
 
 typedef struct {
     char *target;
-    bool terminal;
+    bool  terminal;
 } logical_name_target_t;
 
 typedef struct {
-    char *pointer;
+    char  *pointer;
     size_t len;
 } raw_string_t;
 
-static const raw_string_t raw_null = {
+static raw_string_t const raw_null = {
     .pointer = NULL,
-    .len = 0,
+    .len     = 0,
 };
 
 typedef struct {
     raw_string_t unparsable;
     raw_string_t device;
     raw_string_t dir_components[MAX_DIR_DEPTH];
-    int dir_count;
+    int          dir_count;
     raw_string_t filename;
 } parsed_components_t;
 
-static const parsed_components_t parsed_components_null = {
-    raw_null,
-    raw_null,
-    { raw_null },
-    0,
-    raw_null
-};
+static parsed_components_t const parsed_components_null = {raw_null, raw_null, {raw_null}, 0, raw_null};
 
 KHASH_MAP_INIT_STR(lnametable, logical_name_target_t);
 khash_t(lnametable) * logical_name_table;
 
 static inline bool raw_cmp(raw_string_t *l, raw_string_t *r) {
-    if (l->pointer != r->pointer) return false;
-    if (l->len != r->len) return false;
+    if (l->pointer != r->pointer)
+        return false;
+    if (l->len != r->len)
+        return false;
 
     return true;
 }
@@ -57,7 +58,7 @@ static inline bool raw_cmp(raw_string_t *l, raw_string_t *r) {
 static inline raw_string_t raw_from_cstr(char *cstr) {
     raw_string_t res = {
         .pointer = cstr,
-        .len = strlen(cstr),
+        .len     = strlen(cstr),
     };
 
     return res;
@@ -66,7 +67,7 @@ static inline raw_string_t raw_from_cstr(char *cstr) {
 static inline raw_string_t raw_from_ptr(char *pointer, int len) {
     raw_string_t res = {
         .pointer = pointer,
-        .len = len,
+        .len     = len,
     };
 
     return res;
@@ -74,8 +75,11 @@ static inline raw_string_t raw_from_ptr(char *pointer, int len) {
 
 #ifndef RUN_TEST
 static inline void raw_print(raw_string_t r) {
-    if (r.len == 0 || r.pointer == NULL) { printf("len: %zi '(null)'", r.len); return; }
-    char b = r.pointer[r.len];
+    if (r.len == 0 || r.pointer == NULL) {
+        printf("len: %zi '(null)'", r.len);
+        return;
+    }
+    char b           = r.pointer[r.len];
     r.pointer[r.len] = '\0';
     printf("len: %zi '%s'", r.len, r.pointer);
     r.pointer[r.len] = b;
@@ -83,11 +87,19 @@ static inline void raw_print(raw_string_t r) {
 
 static void parsed_components_dump(parsed_components_t components) {
     printf("Components dump: \n");
-    printf("    Unparsable: "); raw_print(components.unparsable); printf("\n");
-    printf("    Device    : "); raw_print(components.device); printf("\n");
-    printf("    Filename  : "); raw_print(components.filename); printf("\n");
+    printf("    Unparsable: ");
+    raw_print(components.unparsable);
+    printf("\n");
+    printf("    Device    : ");
+    raw_print(components.device);
+    printf("\n");
+    printf("    Filename  : ");
+    raw_print(components.filename);
+    printf("\n");
     for (int i = 0; i < components.dir_count; ++i) {
-        printf("    Dir[%i]   : ", i); raw_print(components.dir_components[i]); printf("\n");
+        printf("    Dir[%i]   : ", i);
+        raw_print(components.dir_components[i]);
+        printf("\n");
     }
 }
 #endif
@@ -108,7 +120,8 @@ static char *parsed_components_serialize(parsed_components_t components) {
 
     size_t result_len = components.device.len;
     // If our device name doesn't already have a ':' we will need to add it
-    if (components.device.pointer[components.device.len - 1] != ':') result_len++;
+    if (components.device.pointer[components.device.len - 1] != ':')
+        result_len++;
 
     result_len += components.filename.len;
     for (int i = 0; i < components.dir_count; ++i) {
@@ -116,11 +129,13 @@ static char *parsed_components_serialize(parsed_components_t components) {
     }
 
     // Directories + '[]'
-    if (components.dir_count) result_len += 2;
+    if (components.dir_count)
+        result_len += 2;
     // One '.' per subdir
-    if (components.dir_count > 1) result_len += components.dir_count - 1;
+    if (components.dir_count > 1)
+        result_len += components.dir_count - 1;
 
-    char *res = malloc(result_len + 1);
+    char *res       = malloc(result_len + 1);
     res[result_len] = '\0';
 
     size_t offset = 0;
@@ -128,13 +143,15 @@ static char *parsed_components_serialize(parsed_components_t components) {
     offset += components.device.len;
 
     // Our device doesn't already have a ':', add it.
-    if (components.device.pointer[components.device.len - 1] != ':') res[offset++] = ':';
+    if (components.device.pointer[components.device.len - 1] != ':')
+        res[offset++] = ':';
 
     if (components.dir_count) {
         res[offset++] = '[';
         for (int i = 0; i < components.dir_count; ++i) {
             // Separator dot for subdirs
-            if (i) res[offset++] = '.';
+            if (i)
+                res[offset++] = '.';
             memcpy(res + offset, components.dir_components[i].pointer, components.dir_components[i].len);
             offset += components.dir_components[i].len;
         }
@@ -144,22 +161,28 @@ static char *parsed_components_serialize(parsed_components_t components) {
     if (components.filename.len) {
         memcpy(res + offset, components.filename.pointer, components.filename.len);
     }
-    
+
     return res;
 }
 
 static inline bool path_cmp(parsed_components_t *l, parsed_components_t *r) {
-    if (l->unparsable.len != r->unparsable.len) return false;
+    if (l->unparsable.len != r->unparsable.len)
+        return false;
     if (l->unparsable.len && r->unparsable.len) {
-        if (raw_cmp(&l->unparsable, &r->unparsable)) return true;
+        if (raw_cmp(&l->unparsable, &r->unparsable))
+            return true;
     }
 
-    if (l->dir_count != r->dir_count) return false;
-    if (!raw_cmp(&l->device, &r->device)) return false;
-    if (!raw_cmp(&l->filename, &r->filename)) return false;
+    if (l->dir_count != r->dir_count)
+        return false;
+    if (!raw_cmp(&l->device, &r->device))
+        return false;
+    if (!raw_cmp(&l->filename, &r->filename))
+        return false;
 
     for (int i = 0; i < l->dir_count; ++i) {
-        if (!raw_cmp(&l->dir_components[i], &r->dir_components[i])) return false;
+        if (!raw_cmp(&l->dir_components[i], &r->dir_components[i]))
+            return false;
     }
 
     return true;
@@ -169,9 +192,9 @@ static inline parsed_components_t parse_string(raw_string_t str) {
     parsed_components_t res = parsed_components_null;
 
     char *device_separator = NULL;
-    char *dir_start = NULL;
-    char *dir_end = NULL;
-    char *last_dir = NULL;
+    char *dir_start        = NULL;
+    char *dir_end          = NULL;
+    char *last_dir         = NULL;
 
     size_t string_size = str.len;
     for (size_t i = 0; i < string_size; ++i) {
@@ -179,41 +202,48 @@ static inline parsed_components_t parse_string(raw_string_t str) {
 
         if (c == ':') {
             // Device separator
-            if (device_separator) goto error;
+            if (device_separator)
+                goto error;
             device_separator = str.pointer + i;
-            res.device = raw_from_ptr(str.pointer, i);
+            res.device       = raw_from_ptr(str.pointer, i);
             continue;
         }
 
         if (c == '[') {
             // Dir start
-            if (dir_start) goto error;
+            if (dir_start)
+                goto error;
             dir_start = str.pointer + i;
-            last_dir = str.pointer + i + 1;
+            last_dir  = str.pointer + i + 1;
             continue;
         }
 
         if (c == ']') {
             // Dir end
-            if (dir_end) goto error;
+            if (dir_end)
+                goto error;
             dir_end = str.pointer + i;
-            res.dir_components[res.dir_count] = raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir);
+            res.dir_components[res.dir_count] =
+                raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir);
             res.dir_count++;
             continue;
         }
 
         if (c == '.' && dir_start && !dir_end) {
             // We're parsing directories
-            res.dir_components[res.dir_count] = raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir);
+            res.dir_components[res.dir_count] =
+                raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir);
             res.dir_count++;
             last_dir = str.pointer + i + 1;
         }
     }
 
     // No device separator
-    if (!device_separator) goto error;
+    if (!device_separator)
+        goto error;
     // Opening '[' but no closing ']'
-    if (dir_start && !dir_end) goto error;
+    if (dir_start && !dir_end)
+        goto error;
 
     if (dir_end) {
         if (dir_end + 1 < str.pointer + string_size) {
@@ -223,7 +253,10 @@ static inline parsed_components_t parse_string(raw_string_t str) {
         // There was no file part
     } else if (device_separator + 1 < str.pointer + string_size) {
         // We have a filename directly after the device
-        res.filename = raw_from_ptr(device_separator + 1, string_size - ((uintptr_t)(device_separator + 1) - (uintptr_t)str.pointer));
+        res.filename = raw_from_ptr(
+            device_separator + 1,
+            string_size - ((uintptr_t)(device_separator + 1) - (uintptr_t)str.pointer)
+        );
     }
 
     return res;
@@ -245,18 +278,18 @@ static raw_string_t resolve_string(raw_string_t string, int depth) {
 
     // This is safe because we are always pointing into a cstr
     // the next character is, at worst, already a '\0'
-    char char_bak = string.pointer[string.len];
+    char char_bak              = string.pointer[string.len];
     string.pointer[string.len] = '\0';
 
     logical_name_target_t *name;
-    khint_t k = kh_get(lnametable, logical_name_table, string.pointer);
+    khint_t                k = kh_get(lnametable, logical_name_table, string.pointer);
     if (k == kh_end(logical_name_table)) {
         string.pointer[string.len] = char_bak;
         return string;
     } else {
-        name = &kh_val(logical_name_table, k);
+        name                       = &kh_val(logical_name_table, k);
         string.pointer[string.len] = char_bak;
-        return resolve_string(raw_from_cstr((char*)name->target), ++depth);
+        return resolve_string(raw_from_cstr((char *)name->target), ++depth);
     }
 }
 
@@ -271,16 +304,16 @@ static raw_string_t resolve_device_string(raw_string_t string, int depth) {
     // must have contained a ':' at some point, so there is definitely enough
     // space.
 
-    char char_bak = string.pointer[string.len];
-    string.pointer[string.len] = ':';
-    string.len += 1;
+    char char_bak               = string.pointer[string.len];
+    string.pointer[string.len]  = ':';
+    string.len                 += 1;
 
     raw_string_t new_string = resolve_string(string, depth);
 
     if (raw_cmp(&string, &new_string)) {
         // This didn't work. Try without the ':'
-        string.len -= 1;
-        string.pointer[string.len] = char_bak;
+        string.len                 -= 1;
+        string.pointer[string.len]  = char_bak;
         return resolve_string(string, depth);
     }
 
@@ -305,7 +338,7 @@ static parsed_components_t _logical_name_resolve(parsed_components_t path, int d
         }
         // We might have a path now. Try again.
         parsed_components_t new_path = parse_string(res);
-        return(_logical_name_resolve(new_path, depth + 1));
+        return (_logical_name_resolve(new_path, depth + 1));
     }
 
     parsed_components_t orig_path = path;
@@ -323,10 +356,14 @@ static parsed_components_t _logical_name_resolve(parsed_components_t path, int d
                 // insert them to the left of our existing directories
                 if (path.dir_count) {
                     // Move our existing directories to the right
-                    memmove(&path.dir_components[device_path.dir_count], path.dir_components, path.dir_count * sizeof(raw_string_t));
+                    memmove(
+                        &path.dir_components[device_path.dir_count],
+                        path.dir_components,
+                        path.dir_count * sizeof(raw_string_t)
+                    );
                 }
                 path.dir_count += device_path.dir_count;
-                
+
                 // Insert our new dir components
                 memcpy(path.dir_components, device_path.dir_components, device_path.dir_count * sizeof(raw_string_t));
             }
@@ -340,7 +377,7 @@ static parsed_components_t _logical_name_resolve(parsed_components_t path, int d
             }
         }
     }
-    
+
     path.filename = resolve_string(path.filename, depth + 1);
     for (int i = 0; i < path.dir_count; ++i) {
         path.dir_components[i] = resolve_string(path.dir_components[i], depth + 1);
@@ -357,19 +394,19 @@ void logical_names_system_init() {
     logical_name_table = kh_init(lnametable);
 }
 
-int logical_name_set(const char *logical_name, const char *target, bool is_terminal) {
+int logical_name_set(char const *logical_name, char const *target, bool is_terminal) {
     logical_name_target_t name;
     // Copy the string so we won't have to copy it later when resolving
     // and add 1 more byte because we might need to resolve it as a device
     name.target = malloc(strlen(target) + 2);
     strcpy(name.target, target);
     name.terminal = is_terminal;
-    khash_insert_str(lnametable, logical_name_table, logical_name, name, const char*);
+    khash_insert_str(lnametable, logical_name_table, logical_name, name, char const *);
 
     return 0;
 }
 
-void logical_name_del(const char *logical_name) {
+void logical_name_del(char const *logical_name) {
     khash_del_str(lnametable, logical_name_table, logical_name, "Logical name did not exist");
 }
 
@@ -383,7 +420,7 @@ char *logical_name_resolve(char *logical_name) {
     return parsed_components_serialize(parsed);
 }
 
-char *logical_name_resolve_const(const char *logical_name) {
+char *logical_name_resolve_const(char const *logical_name) {
     char *tmp = strdup(logical_name);
     char *res = logical_name_resolve(tmp);
     free(tmp);
@@ -393,55 +430,55 @@ char *logical_name_resolve_const(const char *logical_name) {
 #ifdef RUN_TEST
 
 typedef struct {
-    const char *in;
-    const char *expect;
+    char const *in;
+    char const *expect;
 } test_t;
 
 test_t tests[] = {
     // Undefined strings should pass right through
-    { "STRING", "STRING" },
-    { "DEVICE:", "DEVICE:" },
-    { "DEVICE:filename.ext", "DEVICE:filename.ext" },
-    { "DEVICE:[dira]filename.ext", "DEVICE:[dira]filename.ext" },
-    { "DEVICE:[dira.dirb.dirc]filename.ext", "DEVICE:[dira.dirb.dirc]filename.ext" },
+    {"STRING", "STRING"},
+    {"DEVICE:", "DEVICE:"},
+    {"DEVICE:filename.ext", "DEVICE:filename.ext"},
+    {"DEVICE:[dira]filename.ext", "DEVICE:[dira]filename.ext"},
+    {"DEVICE:[dira.dirb.dirc]filename.ext", "DEVICE:[dira.dirb.dirc]filename.ext"},
 
     // Simple substitutions
-    { "SIMPLE", "STRING" },
-    { "SIMPLEDEV:", "MY_SIMPLEDEV:" },
+    {"SIMPLE", "STRING"},
+    {"SIMPLEDEV:", "MY_SIMPLEDEV:"},
 
-    { "USER:", "MYFLASH:[dira]" },
-    { "FLASH0:", "MYFLASH:" },
-    { "FLASH0", "MYFLASH" },
-    { "USER:file.txt", "MYFLASH:[dira]file.txt" },
-    { "USER:[dirb.dirc]file.txt", "MYFLASH:[dira.dirb.dirc]file.txt" },
-    { "TEST1:", "DRIVE0:" },
-    { "TEST2:", "DRIVE0:" },
-    { "TEST3:", "DRIVE0:[dira]" },
-    { "TEST4:", "DRIVE0:[dira.dirb]" },
-    { "TEST5", "DRIVE0:[dira.dirb]filename.ext" },
+    {"USER:", "MYFLASH:[dira]"},
+    {"FLASH0:", "MYFLASH:"},
+    {"FLASH0", "MYFLASH"},
+    {"USER:file.txt", "MYFLASH:[dira]file.txt"},
+    {"USER:[dirb.dirc]file.txt", "MYFLASH:[dira.dirb.dirc]file.txt"},
+    {"TEST1:", "DRIVE0:"},
+    {"TEST2:", "DRIVE0:"},
+    {"TEST3:", "DRIVE0:[dira]"},
+    {"TEST4:", "DRIVE0:[dira.dirb]"},
+    {"TEST5", "DRIVE0:[dira.dirb]filename.ext"},
 
     // Directory name substitions
-    { "USER:[DIR1]", "MYFLASH:[dira.SUBST1]"},
-    { "USER:[DIR1.DIR2]", "MYFLASH:[dira.SUBST1.SUBST2]"},
-    { "USER:[DIR1.DIR2.DIR3]", "MYFLASH:[dira.SUBST1.SUBST2.STRING]"},
+    {"USER:[DIR1]", "MYFLASH:[dira.SUBST1]"},
+    {"USER:[DIR1.DIR2]", "MYFLASH:[dira.SUBST1.SUBST2]"},
+    {"USER:[DIR1.DIR2.DIR3]", "MYFLASH:[dira.SUBST1.SUBST2.STRING]"},
 
     // File name substititions
-    { "USER:[DIR1]FILE", "MYFLASH:[dira.SUBST1]FILE" },
-    { "USER:[DIR1]FILE1", "MYFLASH:[dira.SUBST1]FILENAME.EXT" },
-    { "USER:[DIR1]FILE2", "MYFLASH:[dira.SUBST1]INDIRECT.EXT" },
+    {"USER:[DIR1]FILE", "MYFLASH:[dira.SUBST1]FILE"},
+    {"USER:[DIR1]FILE1", "MYFLASH:[dira.SUBST1]FILENAME.EXT"},
+    {"USER:[DIR1]FILE2", "MYFLASH:[dira.SUBST1]INDIRECT.EXT"},
 
     // Error checks
     // Return original for loops
-    { "CIRC1", "CIRC1" },
-    { "CIRC2", "CIRC2" },
+    {"CIRC1", "CIRC1"},
+    {"CIRC2", "CIRC2"},
 
     // Bad path, treat as string
-    { "BAD:[unclosed", "BAD:[unclosed" },
-    { "DOUBLE::COLON", "DOUBLE::COLON" }, 
+    {"BAD:[unclosed", "BAD:[unclosed"},
+    {"DOUBLE::COLON", "DOUBLE::COLON"},
 
-    { "", "" },
+    {"", ""},
 
-    { NULL, NULL},
+    {NULL, NULL},
 };
 
 int main() {
@@ -466,20 +503,28 @@ int main() {
     logical_name_set("CIRC1", "CIRC2", false);
     logical_name_set("CIRC2", "CIRC1", false);
 
-    bool error = false;
+    bool  error = false;
     char *res;
 
     test_t *test = tests;
-    while(test->in) {
+    while (test->in) {
         printf("=== Running test for '%s' ('%s') === \n", test->in, test->expect);
-        res = logical_name_resolve_const(test->in);
+        res       = logical_name_resolve_const(test->in);
         bool fail = false;
-        if (res && test->expect && strcmp(test->expect, res) != 0) fail = true;
-        if (res && !test->expect) fail = true;
-        if (!res && test->expect) fail = true;
+        if (res && test->expect && strcmp(test->expect, res) != 0)
+            fail = true;
+        if (res && !test->expect)
+            fail = true;
+        if (!res && test->expect)
+            fail = true;
 
         if (fail) {
-            printf("\033[31mTestcase '%s' failed.\n\tExpected: '%s'\n\tActual:   '%s'\033[0m\n", test->in, test->expect, res);
+            printf(
+                "\033[31mTestcase '%s' failed.\n\tExpected: '%s'\n\tActual:   '%s'\033[0m\n",
+                test->in,
+                test->expect,
+                res
+            );
             error = true;
         }
         printf("=== End     test for %s === \n\n", test->in);
@@ -492,7 +537,7 @@ int main() {
     }
 
     logical_name_target_t x;
-    kh_foreach_value(logical_name_table, x, free((void*)x.target));
+    kh_foreach_value(logical_name_table, x, free((void *)x.target));
     kh_destroy(lnametable, logical_name_table);
 }
 #endif
