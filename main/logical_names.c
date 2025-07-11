@@ -42,6 +42,7 @@ typedef struct {
 typedef struct {
     char  *pointer;
     size_t len;
+    bool   terminal;
 } raw_string_t;
 
 static raw_string_t const raw_null = {
@@ -57,7 +58,13 @@ typedef struct {
     raw_string_t filename;
 } parsed_components_t;
 
-static parsed_components_t const parsed_components_null = {raw_null, raw_null, {raw_null}, 0, raw_null};
+static parsed_components_t const parsed_components_null = {
+    .unparsable     = raw_null,
+    .device         = raw_null,
+    .dir_components = {raw_null},
+    .dir_count      = 0,
+    .filename       = raw_null,
+};
 
 KHASH_MAP_INIT_STR(lnametable, logical_name_target_t);
 khash_t(lnametable) * logical_name_table;
@@ -71,19 +78,21 @@ static inline bool raw_cmp(raw_string_t *l, raw_string_t *r) {
     return true;
 }
 
-static inline raw_string_t raw_from_cstr(char *cstr) {
+static inline raw_string_t raw_from_cstr(char *cstr, bool terminal) {
     raw_string_t res = {
-        .pointer = cstr,
-        .len     = strlen(cstr),
+        .pointer  = cstr,
+        .len      = strlen(cstr),
+        .terminal = terminal,
     };
 
     return res;
 }
 
-static inline raw_string_t raw_from_ptr(char *pointer, int len) {
+static inline raw_string_t raw_from_ptr(char *pointer, int len, bool terminal) {
     raw_string_t res = {
-        .pointer = pointer,
-        .len     = len,
+        .pointer  = pointer,
+        .len      = len,
+        .terminal = terminal,
     };
 
     return res;
@@ -221,7 +230,7 @@ static inline parsed_components_t parse_string(raw_string_t str) {
             if (device_separator)
                 goto error;
             device_separator = str.pointer + i;
-            res.device       = raw_from_ptr(str.pointer, i);
+            res.device       = raw_from_ptr(str.pointer, i, false);
             continue;
         }
 
@@ -240,7 +249,7 @@ static inline parsed_components_t parse_string(raw_string_t str) {
                 goto error;
             dir_end = str.pointer + i;
             res.dir_components[res.dir_count] =
-                raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir);
+                raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir, false);
             res.dir_count++;
             continue;
         }
@@ -248,7 +257,7 @@ static inline parsed_components_t parse_string(raw_string_t str) {
         if (c == '.' && dir_start && !dir_end) {
             // We're parsing directories
             res.dir_components[res.dir_count] =
-                raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir);
+                raw_from_ptr(last_dir, (uintptr_t)(str.pointer + i) - (uintptr_t)last_dir, false);
             res.dir_count++;
             last_dir = str.pointer + i + 1;
         }
@@ -264,14 +273,16 @@ static inline parsed_components_t parse_string(raw_string_t str) {
     if (dir_end) {
         if (dir_end + 1 < str.pointer + string_size) {
             // We have a filename after a directory
-            res.filename = raw_from_ptr(dir_end + 1, string_size - ((uintptr_t)(dir_end + 1) - (uintptr_t)str.pointer));
+            res.filename =
+                raw_from_ptr(dir_end + 1, string_size - ((uintptr_t)(dir_end + 1) - (uintptr_t)str.pointer), false);
         }
         // There was no file part
     } else if (device_separator + 1 < str.pointer + string_size) {
         // We have a filename directly after the device
         res.filename = raw_from_ptr(
             device_separator + 1,
-            string_size - ((uintptr_t)(device_separator + 1) - (uintptr_t)str.pointer)
+            string_size - ((uintptr_t)(device_separator + 1) - (uintptr_t)str.pointer),
+            false
         );
     }
 
@@ -283,11 +294,14 @@ error:
 }
 
 static inline parsed_components_t parse_cstring(char *cstr) {
-    raw_string_t str = raw_from_cstr(cstr);
+    raw_string_t str = raw_from_cstr(cstr, false);
     return parse_string(str);
 }
 
 static raw_string_t resolve_string(raw_string_t string, int depth) {
+    if (string.terminal)
+        return string;
+
     if (depth > RESOLVE_MAX_DEPTH || string.len == 0) {
         return raw_null;
     }
@@ -300,16 +314,19 @@ static raw_string_t resolve_string(raw_string_t string, int depth) {
     logical_name_target_t *name;
     khint_t                k = kh_get(lnametable, logical_name_table, string.pointer);
     if (k == kh_end(logical_name_table)) {
-        string.pointer[string.len] = char_bak;
+        string.pointer[string.len] = char_bak; // Restore character
         return string;
     } else {
+        string.pointer[string.len] = char_bak; // Restore character
         name                       = &kh_val(logical_name_table, k);
-        string.pointer[string.len] = char_bak;
-        return resolve_string(raw_from_cstr((char *)name->target), ++depth);
+        return resolve_string(raw_from_cstr((char *)name->target, name->terminal), ++depth);
     }
 }
 
 static raw_string_t resolve_device_string(raw_string_t string, int depth) {
+    if (string.terminal)
+        return string;
+
     if (depth > RESOLVE_MAX_DEPTH || string.len == 0) {
         return raw_null;
     }
@@ -483,6 +500,11 @@ test_t tests[] = {
     {"USER:[DIR1]FILE1", "MYFLASH:[dira.SUBST1]FILENAME.EXT"},
     {"USER:[DIR1]FILE2", "MYFLASH:[dira.SUBST1]INDIRECT.EXT"},
 
+    // Terminals
+    {"CIRC3", "CIRC3"},   // CIRC4 is terminal
+    {"CIRC4", "CIRC3"},   // CIRC4 is terminal
+    {"USER2:", "TERM3:"}, // TERM2 is terminal
+
     // Error checks
     // Return original for loops
     {"CIRC1", "CIRC1"},
@@ -518,6 +540,14 @@ int main() {
 
     logical_name_set("CIRC1", "CIRC2", false);
     logical_name_set("CIRC2", "CIRC1", false);
+
+    logical_name_set("CIRC3", "CIRC4", false);
+    logical_name_set("CIRC4", "CIRC3", true);
+
+    logical_name_set("USER2:", "TERM1", false);
+    logical_name_set("TERM1", "TERM2", false);
+    logical_name_set("TERM2", "TERM3", true);
+    logical_name_set("TERM3", "UNREACHABLE", false);
 
     bool  error = false;
     char *res;
@@ -556,7 +586,8 @@ int main() {
     kh_foreach_value(logical_name_table, x, free((void *)x.target));
     kh_destroy(lnametable, logical_name_table);
 
-    if (error) return 1;
+    if (error)
+        return 1;
     return 0;
 }
 #endif
