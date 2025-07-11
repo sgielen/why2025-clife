@@ -34,15 +34,20 @@
 
 #include <stdio.h>
 
+#include <ctype.h>
+
 typedef struct {
-    char *target;
-    bool  terminal;
+    char **target;
+    size_t target_count;
+    bool   terminal;
 } logical_name_target_t;
 
 typedef struct {
     char  *pointer;
     size_t len;
     bool   terminal;
+    size_t count;
+    size_t idx;
 } raw_string_t;
 
 static raw_string_t const raw_null = {
@@ -56,6 +61,7 @@ typedef struct {
     raw_string_t dir_components[MAX_DIR_DEPTH];
     int          dir_count;
     raw_string_t filename;
+    size_t       count;
 } parsed_components_t;
 
 static parsed_components_t const parsed_components_null = {
@@ -64,6 +70,7 @@ static parsed_components_t const parsed_components_null = {
     .dir_components = {raw_null},
     .dir_count      = 0,
     .filename       = raw_null,
+    .count          = 0
 };
 
 KHASH_MAP_INIT_STR(lnametable, logical_name_target_t);
@@ -83,6 +90,8 @@ static inline raw_string_t raw_from_cstr(char *cstr, bool terminal) {
         .pointer  = cstr,
         .len      = strlen(cstr),
         .terminal = terminal,
+        .count    = 1,
+        .idx      = 0,
     };
 
     return res;
@@ -93,6 +102,8 @@ static inline raw_string_t raw_from_ptr(char *pointer, int len, bool terminal) {
         .pointer  = pointer,
         .len      = len,
         .terminal = terminal,
+        .count    = 1,
+        .idx      = 0,
     };
 
     return res;
@@ -191,6 +202,9 @@ static char *parsed_components_serialize(parsed_components_t components) {
 }
 
 static inline bool path_cmp(parsed_components_t *l, parsed_components_t *r) {
+    if (l->count != r->count)
+        return false;
+
     if (l->unparsable.len != r->unparsable.len)
         return false;
     if (l->unparsable.len && r->unparsable.len) {
@@ -215,6 +229,8 @@ static inline bool path_cmp(parsed_components_t *l, parsed_components_t *r) {
 
 static inline parsed_components_t parse_string(raw_string_t str) {
     parsed_components_t res = parsed_components_null;
+    // We always have something, even if it is just unparsable
+    res.count               = 1;
 
     char *device_separator = NULL;
     char *dir_start        = NULL;
@@ -298,7 +314,7 @@ static inline parsed_components_t parse_cstring(char *cstr) {
     return parse_string(str);
 }
 
-static raw_string_t resolve_string(raw_string_t string, int depth) {
+static raw_string_t resolve_string(raw_string_t string, size_t idx, int depth) {
     if (string.terminal)
         return string;
 
@@ -319,11 +335,21 @@ static raw_string_t resolve_string(raw_string_t string, int depth) {
     } else {
         string.pointer[string.len] = char_bak; // Restore character
         name                       = &kh_val(logical_name_table, k);
-        return resolve_string(raw_from_cstr((char *)name->target, name->terminal), ++depth);
+        raw_string_t new_string;
+        if (name->target_count > 1) {
+            // If we see an invalid index just get the first one
+            size_t i         = idx > name->target_count - 1 ? 0 : idx;
+            new_string       = raw_from_cstr((char *)name->target[i], name->terminal);
+            new_string.count = name->target_count;
+            new_string.idx   = idx;
+        } else {
+            new_string = raw_from_cstr((char *)name->target[0], name->terminal);
+        }
+        return resolve_string(new_string, idx, ++depth);
     }
 }
 
-static raw_string_t resolve_device_string(raw_string_t string, int depth) {
+static raw_string_t resolve_device_string(raw_string_t string, size_t idx, int depth) {
     if (string.terminal)
         return string;
 
@@ -341,13 +367,13 @@ static raw_string_t resolve_device_string(raw_string_t string, int depth) {
     string.pointer[string.len]  = ':';
     string.len                 += 1;
 
-    raw_string_t new_string = resolve_string(string, depth);
+    raw_string_t new_string = resolve_string(string, idx, depth);
 
     if (raw_cmp(&string, &new_string)) {
         // This didn't work. Try without the ':'
         string.len                 -= 1;
         string.pointer[string.len]  = char_bak;
-        return resolve_string(string, depth);
+        return resolve_string(string, idx, depth);
     }
 
     // Don't strip any trailing ':', this avoids trouble if both DEVICE
@@ -355,14 +381,21 @@ static raw_string_t resolve_device_string(raw_string_t string, int depth) {
     return new_string;
 }
 
-static parsed_components_t _logical_name_resolve(parsed_components_t path, int depth) {
+static parsed_components_t _logical_name_resolve(parsed_components_t path, size_t list_idx, int depth) {
     if (depth > RESOLVE_MAX_DEPTH) {
         return parsed_components_null;
     }
 
     if (path.unparsable.len) {
         // Just a string
-        raw_string_t res = resolve_string(path.unparsable, depth + 1);
+        raw_string_t res = resolve_string(path.unparsable, 0, depth + 1);
+        if (res.count > 1) {
+            if (path.count == 1) {
+                // Set the result count to our first list
+                path.count = res.count;
+                res        = resolve_string(path.unparsable, list_idx, depth + 1);
+            }
+        }
 
         // 1) If we looped or otherwise hit the max depth don't do anything
         // 2) If there was no change we are done
@@ -371,19 +404,31 @@ static parsed_components_t _logical_name_resolve(parsed_components_t path, int d
         }
         // We might have a path now. Try again.
         parsed_components_t new_path = parse_string(res);
-        return (_logical_name_resolve(new_path, depth + 1));
+        // Make sure we don't lose our result count
+        new_path.count               = path.count;
+        return (_logical_name_resolve(new_path, 0, depth + 1));
     }
 
     parsed_components_t orig_path = path;
 
     // Actual path of some kind
-    raw_string_t new_device = resolve_device_string(path.device, depth + 1);
+    raw_string_t new_device = resolve_device_string(path.device, 0, depth + 1);
+    if (new_device.count > 1) {
+        if (path.count == 1) {
+            // Set the result count to our first list
+            path.count = new_device.count;
+            // Re-resolve using the first list, only the first time
+            new_device = resolve_device_string(new_device, list_idx, depth + 1);
+        }
+    }
+
     if (!raw_cmp(&new_device, &path.device)) {
-        // Our device might have expanded into a bigger path
         parsed_components_t device_path = parse_string(new_device);
         if (device_path.unparsable.len) {
+            // Still just a plain string
             path.device = new_device;
         } else {
+            // Our device might have expanded into a bigger path
             if (device_path.dir_count) {
                 // Our device expanded to something with directories
                 // insert them to the left of our existing directories
@@ -411,16 +456,16 @@ static parsed_components_t _logical_name_resolve(parsed_components_t path, int d
         }
     }
 
-    path.filename = resolve_string(path.filename, depth + 1);
+    path.filename = resolve_string(path.filename, 0, depth + 1);
     for (int i = 0; i < path.dir_count; ++i) {
-        path.dir_components[i] = resolve_string(path.dir_components[i], depth + 1);
+        path.dir_components[i] = resolve_string(path.dir_components[i], 0, depth + 1);
     }
 
     if (path_cmp(&orig_path, &path)) {
         return path;
     }
 
-    return _logical_name_resolve(path, depth + 1);
+    return _logical_name_resolve(path, list_idx, depth + 1);
 }
 
 void logical_names_system_init() {
@@ -429,35 +474,92 @@ void logical_names_system_init() {
 
 int logical_name_set(char const *logical_name, char const *target, bool is_terminal) {
     logical_name_target_t name;
-    // Copy the string so we won't have to copy it later when resolving
-    // and add 1 more byte because we might need to resolve it as a device
-    name.target = malloc(strlen(target) + 2);
-    strcpy(name.target, target);
-    name.terminal = is_terminal;
-    khash_insert_str(lnametable, logical_name_table, logical_name, name, char const *);
+    name.target_count  = 0;
+    size_t name_size   = strlen(target);
+    size_t last_name   = 0;
+    size_t num_targets = 1;
 
-    return 0;
+    // Count elements
+    for (size_t i = 0; i < name_size; ++i) {
+        char c = target[i];
+        if (c == ',' || c == '\0')
+            ++num_targets;
+    }
+
+    name.target = malloc(num_targets * sizeof(char *));
+
+    // See if we have a list
+    for (size_t i = 0; i <= name_size; ++i) {
+        char c = target[i];
+
+        if (c == ',' || c == '\0') {
+            // We found a component
+            // Strip whitespace
+            size_t end = i;
+            for (size_t k = last_name; k < i; ++k) {
+                if (isspace((int)target[k])) {
+                    last_name++;
+                    continue;
+                }
+                break;
+            }
+            for (size_t k = i; k > last_name; --k) {
+                if (isspace((int)target[k])) {
+                    --end;
+                    continue;
+                }
+                break;
+            }
+            size_t component_size = end - last_name;
+            if (component_size && component_size <= name_size) {
+                // Copy the string so we won't have to copy it later when resolving
+                // and add 1 more byte because we might need to resolve it as a device
+                char *t = malloc(component_size + 2);
+                memcpy(t, target + last_name, component_size);
+                t[component_size]              = '\0';
+                name.target[name.target_count] = t;
+                name.target_count++;
+                last_name = i + 1; // Skip ','
+            }
+        }
+    }
+
+    name.terminal = is_terminal;
+
+    if (name.target_count) {
+        khash_insert_str(lnametable, logical_name_table, logical_name, name, char const *);
+        return 0;
+    }
+
+    free(name.target);
+    return 1;
 }
 
 void logical_name_del(char const *logical_name) {
     khash_del_str(lnametable, logical_name_table, logical_name, "Logical name did not exist");
 }
 
-
-char *logical_name_resolve(char *logical_name) {
+logical_name_result_t logical_name_resolve(char *logical_name, size_t idx) {
+    logical_name_result_t result;
     if (!logical_name || !strlen(logical_name)) {
         // Don't try and parse empty strings or NULL
-        return strdup("");
+        result.result_count = 0;
+        result.result       = NULL;
+        goto out;
     }
-    parsed_components_t parsed = _logical_name_resolve(parse_cstring(logical_name), 0);
-    return parsed_components_serialize(parsed);
+    parsed_components_t parsed = _logical_name_resolve(parse_cstring(logical_name), idx, 0);
+    result.result              = parsed_components_serialize(parsed);
+    result.result_count        = parsed.count;
+
+out:
+    return result;
 }
 
-char *logical_name_resolve_const(char const *logical_name) {
-    char *tmp = strdup(logical_name);
-    char *res = logical_name_resolve(tmp);
+logical_name_result_t logical_name_resolve_const(char const *logical_name, size_t idx) {
+    char                 *tmp    = strdup(logical_name);
+    logical_name_result_t result = logical_name_resolve(tmp, idx);
     free(tmp);
-    return res;
+    return result;
 }
 
 #ifdef RUN_TEST
@@ -465,58 +567,72 @@ char *logical_name_resolve_const(char const *logical_name) {
 typedef struct {
     char const *in;
     char const *expect;
+    size_t      expect_count;
+    size_t      idx;
 } test_t;
 
 test_t tests[] = {
     // Undefined strings should pass right through
-    {"STRING", "STRING"},
-    {"DEVICE:", "DEVICE:"},
-    {"DEVICE:filename.ext", "DEVICE:filename.ext"},
-    {"DEVICE:[dira]filename.ext", "DEVICE:[dira]filename.ext"},
-    {"DEVICE:[dira.dirb.dirc]filename.ext", "DEVICE:[dira.dirb.dirc]filename.ext"},
+    {"STRING", "STRING", 1, 0},
+    {"DEVICE:", "DEVICE:", 1, 0},
+    {"DEVICE:filename.ext", "DEVICE:filename.ext", 1, 0},
+    {"DEVICE:[dira]filename.ext", "DEVICE:[dira]filename.ext", 1, 0},
+    {"DEVICE:[dira.dirb.dirc]filename.ext", "DEVICE:[dira.dirb.dirc]filename.ext", 1, 0},
 
     // Simple substitutions
-    {"SIMPLE", "STRING"},
-    {"SIMPLEDEV:", "MY_SIMPLEDEV:"},
+    {"SIMPLE", "STRING", 1, 0},
+    {"SIMPLEDEV:", "MY_SIMPLEDEV:", 1, 0},
 
-    {"USER:", "MYFLASH:[dira]"},
-    {"FLASH0:", "MYFLASH:"},
-    {"FLASH0", "MYFLASH"},
-    {"USER:file.txt", "MYFLASH:[dira]file.txt"},
-    {"USER:[dirb.dirc]file.txt", "MYFLASH:[dira.dirb.dirc]file.txt"},
-    {"TEST1:", "DRIVE0:"},
-    {"TEST2:", "DRIVE0:"},
-    {"TEST3:", "DRIVE0:[dira]"},
-    {"TEST4:", "DRIVE0:[dira.dirb]"},
-    {"TEST5", "DRIVE0:[dira.dirb]filename.ext"},
+    {"USER:", "MYFLASH:[dira]", 1, 0},
+    {"FLASH0:", "MYFLASH:", 1, 0},
+    {"FLASH0", "MYFLASH", 1, 0},
+    {"USER:file.txt", "MYFLASH:[dira]file.txt", 1, 0},
+    {"USER:[dirb.dirc]file.txt", "MYFLASH:[dira.dirb.dirc]file.txt", 1, 0},
+    {"TEST1:", "DRIVE0:", 1, 0},
+    {"TEST2:", "DRIVE0:", 1, 0},
+    {"TEST3:", "DRIVE0:[dira]", 1, 0},
+    {"TEST4:", "DRIVE0:[dira.dirb]", 1, 0},
+    {"TEST5", "DRIVE0:[dira.dirb]filename.ext", 1, 0},
 
     // Directory name substitions
-    {"USER:[DIR1]", "MYFLASH:[dira.SUBST1]"},
-    {"USER:[DIR1.DIR2]", "MYFLASH:[dira.SUBST1.SUBST2]"},
-    {"USER:[DIR1.DIR2.DIR3]", "MYFLASH:[dira.SUBST1.SUBST2.STRING]"},
+    {"USER:[DIR1]", "MYFLASH:[dira.SUBST1]", 1, 0},
+    {"USER:[DIR1.DIR2]", "MYFLASH:[dira.SUBST1.SUBST2]", 1, 0},
+    {"USER:[DIR1.DIR2.DIR3]", "MYFLASH:[dira.SUBST1.SUBST2.STRING]", 1, 0},
 
     // File name substititions
-    {"USER:[DIR1]FILE", "MYFLASH:[dira.SUBST1]FILE"},
-    {"USER:[DIR1]FILE1", "MYFLASH:[dira.SUBST1]FILENAME.EXT"},
-    {"USER:[DIR1]FILE2", "MYFLASH:[dira.SUBST1]INDIRECT.EXT"},
+    {"USER:[DIR1]FILE", "MYFLASH:[dira.SUBST1]FILE", 1, 0},
+    {"USER:[DIR1]FILE1", "MYFLASH:[dira.SUBST1]FILENAME.EXT", 1, 0},
+    {"USER:[DIR1]FILE2", "MYFLASH:[dira.SUBST1]INDIRECT.EXT", 1, 0},
 
     // Terminals
-    {"CIRC3", "CIRC3"},   // CIRC4 is terminal
-    {"CIRC4", "CIRC3"},   // CIRC4 is terminal
-    {"USER2:", "TERM3:"}, // TERM2 is terminal
+    {"CIRC3", "CIRC3", 1, 0},   // CIRC4 is terminal
+    {"CIRC4", "CIRC3", 1, 0},   // CIRC4 is terminal
+    {"USER2:", "TERM3:", 1, 0}, // TERM2 is terminal
+
+    // Lists
+    {"LIST1", "ONE", 3, 0},
+    {"LIST1", "TWO", 3, 1},
+    {"LIST1", "THREE", 3, 2},
+
+    {"LIST2", "MYFLASH:[dira]", 1, 0},
 
     // Error checks
     // Return original for loops
-    {"CIRC1", "CIRC1"},
-    {"CIRC2", "CIRC2"},
+    {"CIRC1", "CIRC1", 1, 0},
+    {"CIRC2", "CIRC2", 1, 0},
 
     // Bad path, treat as string
-    {"BAD:[unclosed", "BAD:[unclosed"},
-    {"DOUBLE::COLON", "DOUBLE::COLON"},
+    {"BAD:[unclosed", "BAD:[unclosed", 1, 0},
+    {"DOUBLE::COLON", "DOUBLE::COLON", 1, 0},
 
-    {"", ""},
+    // Nested lists
+    {"LIST3", "ONE", 3, 0},
+    {"LIST3", "MYFLASH", 3, 1}, // Nested lists get kinda screwy
+    {"LIST3", "THREE", 3, 2},
 
-    {NULL, NULL},
+    //{"", NULL, 0, 0},
+
+    {NULL, NULL, 0, 0},
 };
 
 int main() {
@@ -549,32 +665,42 @@ int main() {
     logical_name_set("TERM2", "TERM3", true);
     logical_name_set("TERM3", "UNREACHABLE", false);
 
-    bool  error = false;
-    char *res;
+    logical_name_set("LIST1", "ONE, TWO, THREE", false);
+    logical_name_set("LIST2", "USER, FLASH0", false);
+    logical_name_set("LIST3", "LIST1, LIST2", false);
+
+    bool                  error = false;
+    logical_name_result_t res;
 
     test_t *test = tests;
     while (test->in) {
         printf("=== Running test for '%s' ('%s') === \n", test->in, test->expect);
-        res       = logical_name_resolve_const(test->in);
+        res       = logical_name_resolve_const(test->in, test->idx);
         bool fail = false;
-        if (res && test->expect && strcmp(test->expect, res) != 0)
+
+        if (res.result_count != test->expect_count)
             fail = true;
-        if (res && !test->expect)
+        if (res.result_count && test->expect && strcmp(test->expect, res.result) != 0)
             fail = true;
-        if (!res && test->expect)
+        if (res.result_count && !test->expect)
+            fail = true;
+        if (!res.result_count && test->expect)
             fail = true;
 
         if (fail) {
             printf(
-                "\033[31mTestcase '%s' failed.\n\tExpected: '%s'\n\tActual:   '%s'\033[0m\n",
+                "\033[31mTestcase '%s' failed.\n\tExpected: '%s'\n\tActual:   '%s'\n\tCount:    %zi\n\tActual:   "
+                "%zi\033[0m\n",
                 test->in,
                 test->expect,
-                res
+                res.result,
+                test->expect_count,
+                res.result_count
             );
             error = true;
         }
         printf("=== End     test for %s === \n\n", test->in);
-        free(res);
+        free(res.result);
         ++test;
     }
 
@@ -583,7 +709,12 @@ int main() {
     }
 
     logical_name_target_t x;
-    kh_foreach_value(logical_name_table, x, free((void *)x.target));
+    kh_foreach_value(logical_name_table, x, {
+        for (size_t i = 0; i < x.target_count; ++i) {
+            free((void *)x.target[i]);
+        }
+        free((void *)x.target);
+    });
     kh_destroy(lnametable, logical_name_table);
 
     if (error)
