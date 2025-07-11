@@ -96,8 +96,15 @@ long why_random() {
     return rand_r(&task_info->seed);
 }
 
+int *why___errno() {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_errno", "Calling __errno from task %p", task_info->handle);
+    return &task_info->_errno;
+}
+
 int *why_errno() {
     task_info_t *task_info = get_task_info();
+    ESP_LOGI("why_errno", "Calling errno from task %p", task_info->handle);
     return &task_info->_errno;
 }
 
@@ -331,7 +338,7 @@ int why_open(char const *pathname, int flags, mode_t mode) {
     }
 
     if (dev_fd < 0) {
-        task_info->_errno = EFAULT;
+        task_info->_errno = ENOENT;
         goto out;
     }
 

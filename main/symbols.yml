@@ -878,7 +878,6 @@ simple_function_extern:
   - __divdf3
 
 simple_object:
-  - __errno
 
 wrapped_function:
   - asctime
@@ -946,3 +945,4 @@ wrapped_object:
   - stdin
   - stdout
   - stderr
+  - __errno

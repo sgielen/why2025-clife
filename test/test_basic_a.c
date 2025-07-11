@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -18,7 +19,8 @@ int main(int argc, char *argv[]) {
         fclose(f);
     }
 
-    f = fopen("SEARCH:ANOTHERFILE.NAME", "r");
+    //f = fopen("SEARCH:ANOTHERFILE.NAME", "r");
+    f = fopen("SEARCH:NONEXISTENT", "r");
     printf("fopen: %p\n", f);
     if (f) {
         char *x = malloc(1024);
@@ -28,7 +30,7 @@ int main(int argc, char *argv[]) {
         printf("String: %s\n", x);
         fclose(f);
     } else {
-        printf("********** Failed to open File!\n");
+        printf("********** Failed to open File (%s)!\n", strerror(errno));
     }
 
     f = fopen("FLASH0:[SUBDIR.ANOTHER]NEW_FILE", "w+");
