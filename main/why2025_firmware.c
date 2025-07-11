@@ -72,7 +72,7 @@ int app_main(void) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     };
 
-#if 0 
+#if 0
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     printf("Suspending worker task A\n");
     vTaskSuspend(elf_a);

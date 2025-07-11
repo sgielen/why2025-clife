@@ -10,8 +10,8 @@ idf_component_register(
 	 "logical_names.c"
 	 "drivers/tty.c"
 	 "drivers/fatfs.c"
-    INCLUDE_DIRS "." 
-    EMBED_FILES 
+    INCLUDE_DIRS "."
+    EMBED_FILES
     	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
 	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
 	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
@@ -20,8 +20,8 @@ idf_component_register(
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
-    COMMAND ${PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/generate_symbols.py 
-            ${CMAKE_CURRENT_SOURCE_DIR}/symbols.yml 
+    COMMAND ${PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/generate_symbols.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/symbols.yml
             ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/symbols.yml
             ${CMAKE_CURRENT_SOURCE_DIR}/generate_symbols.py
@@ -29,7 +29,7 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(generated_symbols 
+add_custom_target(generated_symbols
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
 )
 

@@ -14,15 +14,15 @@ enable_testing()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../main)
 
-add_executable(logical_names_test 
+add_executable(logical_names_test
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/logical_names.c
 )
 
 target_compile_definitions(logical_names_test PRIVATE RUN_TEST)
 
-target_compile_options(logical_names_test PRIVATE 
-    -Wall 
-    -Wextra 
+target_compile_options(logical_names_test PRIVATE
+    -Wall
+    -Wextra
     -Werror
 )
 

@@ -143,4 +143,4 @@ if __name__ == '__main__':
         )
 
     print(f"Generated list of {len(seen_symbols)} symbols")
-  
+
