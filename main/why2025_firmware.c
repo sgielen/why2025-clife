@@ -39,11 +39,14 @@ extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
 
 int app_main(void) {
+    logical_names_system_init();
     device_init();
     task_init();
 
     device_register("TT01", tty_create(true, true));
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
+
+    logical_name_set("SEARCH", "FLASH0:[SUBDIR], FLASH0:[SUBDIR.ANOTHER]", false);
 
     printf("Hello ESP32P4 firmware\n");
 
@@ -53,17 +56,16 @@ int app_main(void) {
     argv[0]     = strdup("test_elf_c");
     argv[1]     = strdup("argv[xxx]");
 
-    for (int i = 1; i < 270; ++i) {
-        sprintf(argv[1], "argv[%d]", i);
-        why_pid_t pida = run_task(test_elf_c_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-        ESP_LOGI(TAG, "Started task with pid %i", pida);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    // for (int i = 1; i < 270; ++i) {
+    sprintf(argv[1], "argv[%d]", 0);
+    why_pid_t pida = run_task(test_elf_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    ESP_LOGI(TAG, "Started task with pid %i", pida);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    //}
     // why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a);
     //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b);
-
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     while (1) {

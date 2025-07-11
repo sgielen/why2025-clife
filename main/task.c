@@ -16,6 +16,7 @@
 
 #include "task.h"
 
+#include "bitfuncs.h"
 #include "esp_elf.h"
 #include "esp_log.h"
 #include "hash_helper.h"
@@ -26,11 +27,6 @@
 #include <iconv.h>
 #include <regex.h>
 #include <string.h>
-
-#define bitset(word, bit)   ((word) |= (1 << (bit)))
-#define bitclear(word, bit) ((word) &= ~(1 << (bit)))
-#define bitflip(word, bit)  ((word) ^= (1 << (bit)))
-#define bitcheck(word, bit) ((word) & (1 << (bit)))
 
 static char const *TAG = "task";
 
@@ -327,6 +323,8 @@ why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, cha
         ESP_LOGW(TAG, "Cannot allocate PID for new task");
         return -1;
     }
+
+    stack_size = stack_size < MIN_STACK_SIZE ? MIN_STACK_SIZE : stack_size;
 
     task_info_t *task_info = task_info_init();
 

@@ -29,12 +29,12 @@
 #include "hash_helper.h"
 #include "khash.h"
 
-#define MAX_DIR_DEPTH     25
-#define RESOLVE_MAX_DEPTH 15
-
 #include <stdio.h>
 
 #include <ctype.h>
+
+#define MAX_DIR_DEPTH     25
+#define RESOLVE_MAX_DEPTH 15
 
 typedef struct {
     char **target;
@@ -74,7 +74,7 @@ static parsed_components_t const parsed_components_null = {
 };
 
 KHASH_MAP_INIT_STR(lnametable, logical_name_target_t);
-khash_t(lnametable) * logical_name_table;
+static khash_t(lnametable) * logical_name_table;
 
 static inline bool raw_cmp(raw_string_t *l, raw_string_t *r) {
     if (l->pointer != r->pointer)
@@ -418,7 +418,7 @@ static parsed_components_t _logical_name_resolve(parsed_components_t path, size_
             // Set the result count to our first list
             path.count = new_device.count;
             // Re-resolve using the first list, only the first time
-            new_device = resolve_device_string(new_device, list_idx, depth + 1);
+            new_device = resolve_device_string(path.device, list_idx, depth + 1);
         }
     }
 
@@ -562,6 +562,10 @@ logical_name_result_t logical_name_resolve_const(char const *logical_name, size_
     return result;
 }
 
+void logical_name_result_free(logical_name_result_t result) {
+    free(result.result);
+}
+
 #ifdef RUN_TEST
 
 typedef struct {
@@ -615,6 +619,8 @@ test_t tests[] = {
     {"LIST1", "THREE", 3, 2},
 
     {"LIST2", "MYFLASH:[dira]", 1, 0},
+    {"SEARCH:", "DRIVE0:[SUBDIR]", 2, 0},
+    {"SEARCH:", "DRIVE0:[SUBDIR.ANOTHER]", 2, 1},
 
     // Error checks
     // Return original for loops
@@ -668,6 +674,8 @@ int main() {
     logical_name_set("LIST1", "ONE, TWO, THREE", false);
     logical_name_set("LIST2", "USER, FLASH0", false);
     logical_name_set("LIST3", "LIST1, LIST2", false);
+
+    logical_name_set("SEARCH", "DRIVE0:[SUBDIR], DRIVE0:[SUBDIR.ANOTHER]", false);
 
     bool                  error = false;
     logical_name_result_t res;

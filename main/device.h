@@ -25,7 +25,6 @@
 #include <sys/types.h>
 
 KHASH_MAP_INIT_STR(devtable, void *);
-extern khash_t(devtable) * device_table;
 
 typedef struct device_s {
     int (*_open)(void *dev, path_t *path, int flags, mode_t mode);

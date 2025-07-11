@@ -15,6 +15,7 @@
  */
 
 #include "esp_log.h"
+#include "logical_names.h"
 #include "pathfuncs.h"
 #include "rom/uart.h"
 #include "task.h"
@@ -22,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <fcntl.h>
 #include <iconv.h>
 #include <regex.h>
 #include <string.h>
@@ -279,25 +281,55 @@ int why_puts(char const *str) {
     return puts(str);
 }
 
+static int _why_open(char const *pathname, int flags, mode_t mode, device_t **device) {
+    int    dev_fd = -1;
+    path_t parsed_path;
+    int    res = parse_path(pathname, &parsed_path);
+
+    if (res) {
+        goto out;
+    }
+
+    *device = device_get(parsed_path.device);
+    if (!device) {
+        goto out;
+    }
+
+    dev_fd = (*device)->_open(device, &parsed_path, flags, mode);
+    if (dev_fd < 0) {
+        goto out;
+    }
+
+out:
+    path_free(&parsed_path);
+    return dev_fd;
+}
+
 int why_open(char const *pathname, int flags, mode_t mode) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("why_open", "Calling open from task %p for path %s", task_info->handle, pathname);
-    int fd = -1;
 
-    path_t parsed_path;
-    int    res = parse_path(pathname, &parsed_path);
-    if (res) {
-        task_info->_errno = EFAULT;
-        goto out;
+    int       fd     = -1;
+    int       dev_fd = -1;
+    device_t *device;
+
+    logical_name_result_t lname        = logical_name_resolve_const(pathname, 0);
+    size_t                result_count = lname.result_count;
+    // search the list.
+    ESP_LOGI("why_open", "Finding file %s, %zi options\n", pathname, result_count);
+    for (int i = 0; i < result_count; ++i) {
+        ESP_LOGI("why_open", "Trying location: %s\n", lname.result);
+        dev_fd = _why_open(lname.result, flags, mode, &device);
+        if (dev_fd >= 0) {
+            ESP_LOGI("why_open", "Found file at %s\n", lname.result);
+            break;
+        }
+
+        logical_name_result_free(lname);
+        ESP_LOGI("why_open", "Resolving at index %i\n", i + 1);
+        lname = logical_name_resolve_const(pathname, i + 1);
     }
 
-    device_t *device = device_get(parsed_path.device);
-    if (!device) {
-        task_info->_errno = EFAULT;
-        goto out;
-    }
-
-    int dev_fd = device->_open(device, &parsed_path, flags, mode);
     if (dev_fd < 0) {
         task_info->_errno = EFAULT;
         goto out;
@@ -321,7 +353,7 @@ int why_open(char const *pathname, int flags, mode_t mode) {
 
 out:
     ESP_LOGI("why_open", "Calling open from task %p for path %s returning %i", task_info->handle, pathname, fd);
-    path_free(&parsed_path);
+    logical_name_result_free(lname);
     return fd;
 }
 

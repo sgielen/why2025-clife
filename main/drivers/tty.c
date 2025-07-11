@@ -29,11 +29,15 @@ typedef struct {
 } tty_device_t;
 
 static int tty_open(void *dev, path_t *path, int flags, mode_t mode) {
+    if (path->directory || path->filename)
+        return -1;
     return 0;
 }
 
 static int tty_close(void *dev, int fd) {
-    return 0;
+    if (fd == 0)
+        return 0;
+    return -1;
 }
 
 static ssize_t tty_write(void *dev, int fd, void const *buf, size_t count) {
@@ -44,7 +48,6 @@ static ssize_t tty_write(void *dev, int fd, void const *buf, size_t count) {
         }
         return count;
     }
-
     return 0;
 }
 
@@ -62,7 +65,6 @@ static ssize_t tty_read(void *dev, int fd, void const *buf, size_t count) {
         ((char *)buf)[0] = c;
         return 1;
     }
-
     return 0;
 }
 

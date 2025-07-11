@@ -16,4 +16,4 @@
 
 #pragma once
 
-extern uintptr_t elf_find_sym(const char *sym_name);
+extern uintptr_t elf_find_sym(char const *sym_name);

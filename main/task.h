@@ -33,6 +33,7 @@ KHASH_MAP_INIT_INT(restable, int);
 #define STRERROR_BUFLEN 128
 #define NUM_PIDS        128
 #define MAX_PID         127
+#define MIN_STACK_SIZE  8192
 
 // We want negative numbers for error conditions
 #define PID_T_TYPE int16_t

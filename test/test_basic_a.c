@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
         fclose(f);
     }
 
-    f = fopen("FLASH0:[SUBDIR.ANOTHER]ANOTHERFILE.NAME", "r");
+    f = fopen("SEARCH:ANOTHERFILE.NAME", "r");
     printf("fopen: %p\n", f);
     if (f) {
         char *x = malloc(1024);
@@ -27,6 +27,8 @@ int main(int argc, char *argv[]) {
         x[r] = '\0';
         printf("String: %s\n", x);
         fclose(f);
+    } else {
+        printf("********** Failed to open File!\n");
     }
 
     f = fopen("FLASH0:[SUBDIR.ANOTHER]NEW_FILE", "w+");

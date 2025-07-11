@@ -22,8 +22,8 @@
 
 static char const *TAG = "device";
 
-khash_t(devtable) * device_table;
-SemaphoreHandle_t device_table_lock = NULL;
+static khash_t(devtable) * device_table;
+static SemaphoreHandle_t device_table_lock = NULL;
 
 int device_register(char const *name, device_t *device) {
     if (xSemaphoreTake(device_table_lock, portMAX_DELAY) != pdTRUE) {

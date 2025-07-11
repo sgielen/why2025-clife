@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "khash.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -28,5 +30,6 @@ typedef struct {
 void                  logical_names_system_init();
 int                   logical_name_set(char const *logical_name, char const *target, bool is_terminal);
 void                  logical_name_del(char const *logical_name);
+void                  logical_name_result_free(logical_name_result_t result);
 logical_name_result_t logical_name_resolve(char *logical_name, size_t idx);
 logical_name_result_t logical_name_resolve_const(char const *logical_name, size_t idx);
