@@ -555,5 +555,8 @@ int main() {
     logical_name_target_t x;
     kh_foreach_value(logical_name_table, x, free((void *)x.target));
     kh_destroy(lnametable, logical_name_table);
+
+    if (error) return 1;
+    return 0;
 }
 #endif

@@ -2,12 +2,18 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
+include(ExternalProject)
+
 add_subdirectory(test)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(why2025_firmware)
 
-idf_build_get_property(build_dir BUILD_DIR)
-if(TARGET test_basic_a_elf AND TARGET test_basic_b_elf)
-    add_dependencies(__idf_build_target test_basic_a_elf test_basic_b_elf)
-endif()
+ExternalProject_Add(host_tests
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/host_tests
+    BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/host_tests
+    BUILD_COMMAND ninja
+    INSTALL_COMMAND ninja test
+    CONFIGURE_HANDLED_BY_BUILD false
+    BUILD_ALWAYS 1
+)
