@@ -37,12 +37,6 @@
 #define RESOLVE_MAX_DEPTH 15
 
 typedef struct {
-    char **target;
-    size_t target_count;
-    bool   terminal;
-} logical_name_target_t;
-
-typedef struct {
     char  *pointer;
     size_t len;
     bool   terminal;
@@ -535,6 +529,20 @@ int logical_name_set(char const *logical_name, char const *target, bool is_termi
     return 1;
 }
 
+logical_name_target_t logical_name_get(const char *logical_name) {
+    khint_t                k = kh_get(lnametable, logical_name_table, logical_name);
+    if (k == kh_end(logical_name_table)) {
+        logical_name_target_t res = {
+            NULL,
+            0,
+            false
+        };
+        return res;
+    } else {
+        return kh_val(logical_name_table, k);
+    }
+}
+
 void logical_name_del(char const *logical_name) {
     khash_del_str(lnametable, logical_name_table, logical_name, "Logical name did not exist");
 }
@@ -678,6 +686,31 @@ int main() {
     logical_name_set("SEARCH", "DRIVE0:[SUBDIR], DRIVE0:[SUBDIR.ANOTHER]", false);
 
     bool                  error = false;
+    // Test getting
+    logical_name_target_t t;
+    t = logical_name_get("SIMPLE");
+    if (t.target_count != 1) {
+        printf("\033[31mlogical_name_get(\"SIMPLE\") target_count != 1\033[0m\n");
+        error = true;
+    }
+    if (strcmp(t.target[0], "STRING") != 0) {
+        printf("\033[31mlogical_name_get(\"SIMPLE\") result string invalid, got '%s'\033[0m\n", t.target[0]);
+        error = true;
+    }
+    t = logical_name_get("SEARCH");
+    if (t.target_count != 2) {
+        printf("\033[31mlogical_name_get(\"SEARCH\") target_count != 2\033[0m\n");
+        error = true;
+    }
+    if (strcmp(t.target[0], "DRIVE0:[SUBDIR]") != 0) {
+        printf("\033[31mlogical_name_get(\"SEARCH\") result string invalid, got '%s'\033[0m\n", t.target[0]);
+        error = true;
+    }
+    if (strcmp(t.target[1], "DRIVE0:[SUBDIR.ANOTHER]") != 0) {
+        printf("\033[31mlogical_name_get(\"SEARCH\") result string invalid, got '%s'\033[0m\n", t.target[0]);
+        error = true;
+    }
+
     logical_name_result_t res;
 
     test_t *test = tests;
