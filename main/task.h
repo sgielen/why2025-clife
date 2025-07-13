@@ -40,7 +40,7 @@ KHASH_MAP_INIT_INT(restable, int);
 #define PID_T_TYPE int16_t
 typedef PID_T_TYPE why_pid_t;
 
-typedef enum { RES_MALLOC, RES_ICONV_OPEN, RES_REGCOMP, RES_OPEN, RES_RESOURCE_TYPE_MAX } task_resource_type_t;
+typedef enum { RES_ICONV_OPEN, RES_REGCOMP, RES_OPEN, RES_RESOURCE_TYPE_MAX } task_resource_type_t;
 
 typedef enum {
     TASK_TYPE_ELF,
@@ -90,8 +90,13 @@ typedef struct task_info {
     struct tm    localtime_tm;
 } task_info_t;
 
-void         task_init();
-task_info_t *get_task_info();
-why_pid_t    run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
-void         task_record_resource_alloc(task_resource_type_t type, void *ptr);
-void         task_record_resource_free(task_resource_type_t type, void *ptr);
+__attribute__((always_inline)) inline static task_info_t *get_task_info() {
+    task_info_t *task_info = pvTaskGetThreadLocalStoragePointer(NULL, 0);
+
+    return task_info;
+}
+
+void      task_init();
+why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
+void      task_record_resource_alloc(task_resource_type_t type, void *ptr);
+void      task_record_resource_free(task_resource_type_t type, void *ptr);

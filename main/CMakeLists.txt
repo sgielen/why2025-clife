@@ -1,15 +1,16 @@
 idf_component_register(
     SRCS
 	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
-    	 "why2025_firmware.c"
-	 "task.c"
-	 "wrapped_funcs.c"
 	 "device.c"
-	 "pathfuncs.c"
-	 "logical_names.c"
-	 "drivers/tty.c"
 	 "drivers/fatfs.c"
+	 "drivers/tty.c"
+	 "logical_names.c"
+	 "memory.c"
+	 "pathfuncs.c"
+	 "task.c"
 	 "thirdparty/dlmalloc.c"
+	 "wrapped_funcs.c"
+    	 "why2025_firmware.c"
     INCLUDE_DIRS
 	 ${CMAKE_CURRENT_SOURCE_DIR}/
 	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty

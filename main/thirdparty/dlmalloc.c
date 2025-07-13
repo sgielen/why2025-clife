@@ -1,7 +1,3 @@
-#include <stdint.h>
-extern void *why_sbrk(intptr_t increment);
-#define DEBUG 1
-
 /*
   This is a version (aka dlmalloc) of malloc/free/realloc written by
   Doug Lea and released to the public domain, as explained at
@@ -2113,6 +2109,7 @@ static int pthread_init_lock (MLOCK_T *lk) {
 #endif /* MMAP_CLEARS */
 
 #include "dlmalloc.h"
+#include "memory.h"
 
 /* ------------- Global malloc_state and malloc_params ------------------- */
 
@@ -2142,7 +2139,6 @@ static struct malloc_params mparams;
 /* The global malloc_state used for all non-"mspace" calls */
 // static struct malloc_state _gm_;
 // #define gm                 (&_gm_)
-extern struct malloc_state *get_malloc_state();
 #define gm get_malloc_state()
 #define is_global(M)       ((M) == gm)
 

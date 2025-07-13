@@ -16,12 +16,6 @@
 
 #include "dlmalloc.h"
 #include "esp_log.h"
-#include "hal/cache_hal.h"
-#include "hal/cache_ll.h"
-#include "hal/cache_types.h"
-#include "hal/mmu_hal.h"
-#include "hal/mmu_ll.h"
-#include "hal/mmu_types.h"
 #include "logical_names.h"
 #include "pathfuncs.h"
 #include "rom/uart.h"
@@ -43,18 +37,6 @@ extern void spi_flash_enable_interrupts_caches_and_other_cpu(void);
 extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 
 static char const *TAG = "wrapped_functions";
-
-#define validate_user_pointer(ptr, _ret)                                                                               \
-    do {                                                                                                               \
-        task_info_t *task_info = get_task_info();                                                                      \
-        if (unlikely(                                                                                                  \
-                (uintptr_t)ptr >= (uintptr_t)task_info->argv &&                                                        \
-                (uintptr_t)ptr < ((uintptr_t)task_info->argv) + task_info->argv_size                                   \
-            )) {                                                                                                       \
-            ESP_LOGE(TAG, "PID %d Attempted to manipulate argv allocation", task_info->pid);                           \
-            return _ret;                                                                                               \
-        }                                                                                                              \
-    } while (0);
 
 char *why_strerror(int errnum) {
     task_info_t *task_info = get_task_info();
@@ -142,93 +124,26 @@ int why_atexit(void (*function)(void)) {
     return 0;
 }
 
-void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
-    task_info_t *task_info = get_task_info();
-    uintptr_t    old       = task_info->heap_end;
-    ESP_LOGI("sbrk", "Calling sbrk(%zi) from task %d", increment, task_info->pid);
-
-    if (increment) {
-        uint32_t new_len = task_info->heap_size + increment;
-        uint32_t out_len;
-        uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
-
-        spi_flash_disable_interrupts_caches_and_other_cpu();
-        if (task_info->heap_size) {
-            cache_hal_writeback_addr(task_info->heap_start, task_info->heap_size);
-            mmu_hal_unmap_region(mmu_id, task_info->heap_start, task_info->heap_size);
-        }
-        mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, task_info->heap_start, 0x0, new_len, &out_len);
-
-        cache_bus_mask_t bus_mask;
-        bus_mask = cache_ll_l1_get_bus(0, task_info->heap_start, out_len);
-        cache_ll_l1_enable_bus(0, bus_mask);
-        bus_mask = cache_ll_l1_get_bus(0, task_info->heap_start, out_len);
-        cache_ll_l1_enable_bus(1, bus_mask);
-
-        cache_hal_invalidate_addr(task_info->heap_start, out_len);
-        spi_flash_enable_interrupts_caches_and_other_cpu();
-
-        task_info->heap_size = out_len;
-        task_info->heap_end  = task_info->heap_start + out_len;
-    }
-    ESP_LOGI(
-        "sbrk",
-        "Calling sbrk(%zi) from task %d, returning %p, heap_size=%zi, heap_end=%p",
-        increment,
-        task_info->pid,
-        (void *)old,
-        task_info->heap_size,
-        (void *)task_info->heap_end
-    );
-    return (void *)old;
-}
-
-struct IRAM_ATTR malloc_state *get_malloc_state() {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("get_malloc_state", "Calling get_malloc_state() from task %d", task_info->pid);
-    return &task_info->malloc_state;
-}
-
-void *why_malloc(size_t size) {
+void IRAM_ATTR *why_malloc(size_t size) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("malloc", "Calling malloc(%zi) from task %d", size, task_info->pid);
-    // void *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
     void *ptr = dlmalloc(size);
 
-    // if (likely(ptr)) {
-    //     task_record_resource_alloc(RES_MALLOC, ptr);
-    // }
     ESP_LOGI("malloc", "Calling malloc(%zi) from task %d, returning %p", size, task_info->pid, ptr);
     return ptr;
 }
 
-void *why_calloc(size_t nmemb, size_t size) {
+void IRAM_ATTR *why_calloc(size_t nmemb, size_t size) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("calloc", "Calling calloc(%zi, %zi) from task %d", nmemb, size, task_info->pid);
     void *ptr = dlcalloc(nmemb, size);
-
-    // void *ptr = heap_caps_calloc(nmemb, size, MALLOC_CAP_SPIRAM);
-    // if (likely(ptr)) {
-    //     task_record_resource_alloc(RES_MALLOC, ptr);
-    // }
     return ptr;
 }
 
-void *why_realloc(void *_Nullable ptr, size_t size) {
+void IRAM_ATTR *why_realloc(void *_Nullable ptr, size_t size) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("realloc", "Calling realloc(%p, %zi) from task %d", ptr, size, task_info->pid);
     void *new_ptr = dlrealloc(ptr, size);
-    // validate_user_pointer(ptr, NULL);
-
-    // void *new_ptr = heap_caps_realloc(ptr, size, MALLOC_CAP_SPIRAM);
-    // if (likely(new_ptr != ptr)) {
-    //     if (likely(ptr)) {
-    //         task_record_resource_free(RES_MALLOC, ptr);
-    //     }
-    //     if (likely(new_ptr)) {
-    //         task_record_resource_alloc(RES_MALLOC, new_ptr);
-    //     }
-    // }
     return new_ptr;
 }
 
@@ -236,28 +151,11 @@ void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("reallocarray", "Calling reallocarray(%p, %zi, %zi) from task %d", ptr, nmemb, size, task_info->pid);
     void *new_ptr = dlrealloc(ptr, nmemb * size);
-    // validate_user_pointer(ptr, NULL);
-
-    // void *new_ptr = heap_caps_realloc(ptr, nmemb * size, MALLOC_CAP_SPIRAM);
-    // if (likely(new_ptr != ptr)) {
-    //     if (likely(ptr)) {
-    //         task_record_resource_free(RES_MALLOC, ptr);
-    //     }
-    //     if (likely(new_ptr)) {
-    //         task_record_resource_alloc(RES_MALLOC, new_ptr);
-    //     }
-    // }
     return new_ptr;
 }
 
-void why_free(void *_Nullable ptr) {
+void IRAM_ATTR why_free(void *_Nullable ptr) {
     dlfree(ptr);
-    // validate_user_pointer(ptr, );
-
-    // if (likely(ptr)) {
-    //     task_record_resource_free(RES_MALLOC, ptr);
-    // }
-    // heap_caps_free(ptr);
 }
 
 iconv_t why_iconv_open(char const *tocode, char const *fromcode) {
@@ -269,7 +167,6 @@ iconv_t why_iconv_open(char const *tocode, char const *fromcode) {
 }
 
 int why_iconv_close(iconv_t cd) {
-    validate_user_pointer(cd, -1);
     task_record_resource_free(RES_ICONV_OPEN, cd);
     return iconv_close(cd);
 }
@@ -283,7 +180,6 @@ int why_regcomp(regex_t *restrict preg, char const *restrict regex, int cflags) 
 }
 
 void why_regfree(regex_t *preg) {
-    validate_user_pointer(preg, );
     task_record_resource_free(RES_REGCOMP, preg);
     return regfree(preg);
 }
@@ -297,25 +193,31 @@ int why_tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
 }
 
 wchar_t *why_wcsdup(wchar_t const *s) {
-    wchar_t *ptr = wcsdup(s);
-    if (likely(ptr)) {
-        task_record_resource_alloc(RES_MALLOC, ptr);
+    size_t   len = wcslen(s);
+    wchar_t *ptr = why_malloc((len + 1) * sizeof(wchar_t));
+    if (ptr) {
+        memcpy(ptr, s, len * sizeof(wchar_t));
+        ptr[len] = L'\0';
     }
     return ptr;
 }
 
 char *why_strdup(char const *s) {
-    char *ptr = strdup(s);
-    if (likely(ptr)) {
-        task_record_resource_alloc(RES_MALLOC, ptr);
+    size_t len = strlen(s);
+    char  *ptr = why_malloc((len + 1) * sizeof(char));
+    if (ptr) {
+        memcpy(ptr, s, len * sizeof(char));
+        ptr[len] = '\0';
     }
     return ptr;
 }
 
 char *why_strndup(char const *s, size_t n) {
-    char *ptr = strndup(s, n);
-    if (likely(ptr)) {
-        task_record_resource_alloc(RES_MALLOC, ptr);
+    size_t len = strnlen(s, n);
+    char  *ptr = why_malloc((len + 1) * sizeof(char));
+    if (ptr) {
+        memcpy(ptr, s, len * sizeof(char));
+        ptr[len] = '\0';
     }
     return ptr;
 }
