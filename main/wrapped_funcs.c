@@ -183,7 +183,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
     return (void *)old;
 }
 
-struct malloc_state *get_malloc_state() {
+struct IRAM_ATTR malloc_state *get_malloc_state() {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("get_malloc_state", "Calling get_malloc_state() from task %d", task_info->pid);
     return &task_info->malloc_state;

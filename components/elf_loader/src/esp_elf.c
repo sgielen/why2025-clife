@@ -657,3 +657,45 @@ void esp_elf_print_sec(esp_elf_t *elf)
 
     ESP_LOGI(TAG, "entry:  %p", elf->entry);
 }
+
+uint32_t why_elf_get_vmem_requirements(const uint8_t *pbuf)
+{
+    const elf32_hdr_t *ehdr = (const elf32_hdr_t *)pbuf;
+    const elf32_shdr_t *shdr = (const elf32_shdr_t *)(pbuf + ehdr->shoff);
+    const char *shstrtab = (const char *)pbuf + shdr[ehdr->shstrndx].offset;
+
+    for (uint32_t i = 0; i < ehdr->shnum; i++) {
+        if (shdr[i].type == SHT_NOTE) {
+            const char *section_name = shstrtab + shdr[i].name;
+            if (strcmp(section_name, ".note.vmem_info") == 0) {
+                ESP_LOGD(TAG, "found .note.vmem_info");
+                const uint8_t *note_data = pbuf + shdr[i].offset;
+                const uint32_t *note_hdr = (const uint32_t *)note_data;
+
+                uint32_t namesz = note_hdr[0];
+                uint32_t descsz = note_hdr[1];
+                uint32_t type = note_hdr[2];
+
+                ESP_LOGD(TAG, "Raw note data:");
+                for (int j = 0; j < 32 && j < shdr[i].size; j += 4) {
+                    uint32_t word = *(uint32_t*)(note_data + j);
+                    ESP_LOGD(TAG, "  [%02d]: 0x%08lx (%lu)", j, word, word);
+                }
+
+                if (type == 0x12345678 && descsz >= 4) {
+                    const char *name = (const char *)(note_hdr + 3);
+                    if (strncmp(name, "VMEM", 4) == 0) {
+                        uint32_t name_offset = 12;
+                        uint32_t name_padded = (namesz + 3) & ~3;
+                        uint32_t desc_offset = name_offset + name_padded;
+
+                        const uint32_t *desc = (const uint32_t *)(note_data + desc_offset);
+                        return *desc;
+                    }
+                }
+            }
+        }
+    }
+    ESP_LOGW(TAG, "No VMEM info found");
+    return 0;
+}

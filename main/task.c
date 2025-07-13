@@ -231,6 +231,10 @@ static void elf_task(task_info_t *task_info) {
     esp_elf_t *elf  = malloc(sizeof(esp_elf_t));
     task_info->data = elf;
 
+    uint32_t vmem = why_elf_get_vmem_requirements((uint8_t const *)task_info->buffer);
+
+    ESP_LOGI(TAG, "VMEM requirement: %lu\n", vmem);
+
     ret = esp_elf_init(elf);
     if (ret < 0) {
         ESP_LOGE(TAG, "Failed to initialize ELF file errno=%d", ret);

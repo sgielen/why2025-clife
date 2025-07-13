@@ -98,6 +98,8 @@ void esp_elf_print_shdr(const uint8_t *pbuf);
  */
 void esp_elf_print_sec(esp_elf_t *elf);
 
+uint32_t why_elf_get_vmem_requirements(const uint8_t *pbuf);
+
 #ifdef __cplusplus
 }
 #endif

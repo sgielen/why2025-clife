@@ -4,6 +4,18 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+__asm__(
+    ".section .note.vmem_info, \"a\", @note\n"
+    ".balign 4\n"
+    ".long 2f - 1f\n"        // namesz
+    ".long 4f - 3f\n"        // descsz
+    ".long 0x12345678\n"     // type (custom)
+    "1: .asciz \"VMEM\"\n"   // name
+    "2: .balign 4\n"
+    "3: .long 1048576\n"     // 1MB virtual memory requirement
+    "4: .balign 4\n"
+);
+
 int main(int argc, char *argv[]) {
 	fprintf(stdout, "Hello ELF world A!\n");
 
