@@ -19,6 +19,8 @@
 #include "drivers/tty.h"
 #include "elf_symbols.h"
 #include "esp_log.h"
+#include "esp_mmu_map.h"
+#include "esp_psram.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "logical_names.h"
@@ -39,6 +41,17 @@ extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
 
 int app_main(void) {
+    esp_psram_init();
+    esp_mmu_map_dump_mapped_blocks(stdout);
+    // void *out_ptr;
+    // esp_mmu_map(0x48000000, 16384, MMU_TARGET_PSRAM0, MMU_MEM_CAP_READ | MMU_MEM_CAP_WRITE | MMU_MEM_CAP_8BIT, 0,
+    // &out_ptr); printf("Got pointer: %p\n", out_ptr); esp_mmu_map_dump_mapped_blocks(stdout);
+
+    // printf("Attempting to write to pointer\n");
+    //((char*)out_ptr)[0] = 'A';
+    // printf("Attempting to read from pointer\n");
+    // printf("Attempting to read from pointer: %c\n", ((char*)out_ptr)[0]);
+
     logical_names_system_init();
     device_init();
     task_init();

@@ -20,6 +20,7 @@ function(build_test_elf name source)
 	    -fno-builtin
 	    -fno-builtin-function
             -Og
+	    -g3
             -fstrict-volatile-bitfields
             -fno-jump-tables
             -fno-tree-switch-conversion

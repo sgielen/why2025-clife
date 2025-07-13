@@ -2,7 +2,6 @@ idf_component_register(
     SRCS
 	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
     	 "why2025_firmware.c"
-	 "khash.h"
 	 "task.c"
 	 "wrapped_funcs.c"
 	 "device.c"
@@ -10,12 +9,20 @@ idf_component_register(
 	 "logical_names.c"
 	 "drivers/tty.c"
 	 "drivers/fatfs.c"
-    INCLUDE_DIRS "."
+	 "thirdparty/dlmalloc.c"
+    INCLUDE_DIRS
+	 ${CMAKE_CURRENT_SOURCE_DIR}/
+	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     EMBED_FILES
     	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
 	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
 	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
 	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
+     PRIV_REQUIRES
+        "esp_mm"
+	"esp_psram"
+	"vfs"
+	"fatfs"
 )
 
 add_custom_command(
@@ -35,6 +42,16 @@ add_custom_target(generated_symbols
 
 add_dependencies(${COMPONENT_LIB} generated_symbols)
 target_link_libraries(${COMPONENT_LIB} PRIVATE m g)
+target_compile_definitions(${COMPONENT_LIB} PRIVATE
+	USE_DL_PREFIX
+	HAVE_MORECORE=1
+	HAVE_MMAP=0
+	HAVE_MREMAP=0
+	MORECORE=why_sbrk
+	MORECORE_CONTIGUOUS=1
+	NO_MALLINFO
+	malloc_getpagesize=0x10000
+)
 
 set(image ../fatfs_image)
 fatfs_create_spiflash_image(storage ${image} FLASH_IN_PROJECT PRESERVE_TIME)

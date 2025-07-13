@@ -5,9 +5,12 @@
 #include <stdlib.h>
 
 int main(int argc, char *argv[]) {
-	void* x = malloc(10);
 	fprintf(stdout, "Hello ELF world A!\n");
 
+    {
+    void* x = malloc(256 * 1024);
+    printf("Got pointer %p\n", x);
+    }
     FILE *f = fopen("FLASH0:TESTFILE", "r");
     printf("fopen: %p\n", f);
     if (f) {
@@ -17,6 +20,11 @@ int main(int argc, char *argv[]) {
         x[r] = '\0';
         printf("String: %s\n", x);
         fclose(f);
+    }
+
+    {
+    void* x = malloc(256 * 1024);
+    printf("Got pointer %p\n", x);
     }
 
     //f = fopen("SEARCH:ANOTHERFILE.NAME", "r");
@@ -33,6 +41,10 @@ int main(int argc, char *argv[]) {
         printf("********** Failed to open File (%s)!\n", strerror(errno));
     }
 
+    {
+    void* x = malloc(256 * 1024);
+    printf("Got pointer %p\n", x);
+    }
     f = fopen("FLASH0:[SUBDIR.ANOTHER]NEW_FILE", "w+");
     printf("fopen: %p\n", f);
     if (f) {
@@ -50,6 +62,10 @@ int main(int argc, char *argv[]) {
         printf("Read: %zi bytes\n", r);
         x[r] = '\0';
         printf("String: %s\n", x);
+    }
+    {
+    void* x = malloc(256 * 1024);
+    printf("Got pointer %p\n", x);
     }
 	return 0;
 }

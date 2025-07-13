@@ -17,6 +17,7 @@
 #pragma once
 
 #include "device.h"
+#include "dlmalloc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "khash.h"
@@ -56,6 +57,11 @@ typedef struct task_info {
     why_pid_t    pid;
     TaskHandle_t handle;
     khash_t(restable) * resources[RES_RESOURCE_TYPE_MAX];
+
+    struct malloc_state malloc_state;
+    uintptr_t           heap_start;
+    uintptr_t           heap_end;
+    size_t              heap_size;
 
     void       *data;
     task_type_t type;

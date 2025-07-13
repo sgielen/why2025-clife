@@ -19,6 +19,12 @@
 #include "bitfuncs.h"
 #include "esp_elf.h"
 #include "esp_log.h"
+#include "hal/cache_hal.h"
+#include "hal/cache_ll.h"
+#include "hal/cache_types.h"
+#include "hal/mmu_hal.h"
+#include "hal/mmu_ll.h"
+#include "hal/mmu_types.h"
 #include "hash_helper.h"
 #include "khash.h"
 
@@ -27,6 +33,9 @@
 #include <iconv.h>
 #include <regex.h>
 #include <string.h>
+
+extern void spi_flash_enable_interrupts_caches_and_other_cpu(void);
+extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 
 static char const *TAG = "task";
 
@@ -265,7 +274,7 @@ static void generic_task(void *ti) {
     vTaskDelete(NULL);
 }
 
-static void cleanup_task(void *ignored) {
+static void IRAM_ATTR NOINLINE_ATTR cleanup_task(void *ignored) {
     why_pid_t dead_pid;
 
     while (1) {
@@ -287,6 +296,13 @@ static void cleanup_task(void *ignored) {
                 }
 
                 process_table_remove_task(task_info);
+                if (task_info->heap_size) {
+                    uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
+                    spi_flash_disable_interrupts_caches_and_other_cpu();
+                    cache_hal_writeback_addr(task_info->heap_start, task_info->heap_size);
+                    mmu_hal_unmap_region(mmu_id, task_info->heap_start, task_info->heap_size);
+                    spi_flash_enable_interrupts_caches_and_other_cpu();
+                }
                 task_info_delete(task_info);
 
                 // Don't free our PID until the last moment
@@ -327,6 +343,10 @@ why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, cha
     stack_size = stack_size < MIN_STACK_SIZE ? MIN_STACK_SIZE : stack_size;
 
     task_info_t *task_info = task_info_init();
+    task_info->heap_start  = (uintptr_t)0x48000000;
+    task_info->heap_end    = (uintptr_t)0x48000000;
+    task_info->heap_size   = 0;
+    memset(&task_info->malloc_state, 0, sizeof(struct malloc_state));
 
     task_info->type          = type;
     task_info->pid           = pid;

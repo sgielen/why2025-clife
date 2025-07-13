@@ -529,14 +529,10 @@ int logical_name_set(char const *logical_name, char const *target, bool is_termi
     return 1;
 }
 
-logical_name_target_t logical_name_get(const char *logical_name) {
-    khint_t                k = kh_get(lnametable, logical_name_table, logical_name);
+logical_name_target_t logical_name_get(char const *logical_name) {
+    khint_t k = kh_get(lnametable, logical_name_table, logical_name);
     if (k == kh_end(logical_name_table)) {
-        logical_name_target_t res = {
-            NULL,
-            0,
-            false
-        };
+        logical_name_target_t res = {NULL, 0, false};
         return res;
     } else {
         return kh_val(logical_name_table, k);

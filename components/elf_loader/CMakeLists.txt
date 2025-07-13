@@ -23,7 +23,7 @@ if(CONFIG_ELF_LOADER)
 endif()
 
 if(CONFIG_IDF_TARGET_ESP32P4)
-    set(priv_req spi_flash esp_mm)
+    set(priv_req spi_flash)
 else()
     set(priv_req spi_flash)
 endif()

@@ -12,7 +12,7 @@ message(STATUS "Host test compiler version: ${CMAKE_C_COMPILER_VERSION}")
 # Enable testing
 enable_testing()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../main)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../main ${CMAKE_CURRENT_SOURCE_DIR}/../main/thirdparty)
 
 add_executable(logical_names_test
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/logical_names.c
