@@ -39,6 +39,7 @@ extern void spi_flash_enable_interrupts_caches_and_other_cpu(void);
 extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 extern void remap_task(task_info_t *task_info);
 extern void unmap_task(task_info_t *task_info);
+extern void __real_xt_unhandled_exception(void *frame);
 
 static char const *TAG = "task";
 
@@ -53,6 +54,32 @@ static SemaphoreHandle_t process_table_lock = NULL;
 
 static TaskHandle_t  cleanup_task_handle;
 static QueueHandle_t cleanup_task_queue;
+
+// Try and handle misbehaving tasks
+void IRAM_ATTR task_graveyard() {
+    if (xPortInIsrContext()) {
+        ESP_DRAM_LOGE("task_graveyard", "In ISR context, no idea what to do");
+
+    } else {
+        ESP_LOGW("task_graveyard", "In ISR context, no idea what to do");
+        esp_rom_printf("task_graveyard\n");
+        vTaskDelete(NULL);
+    }
+}
+
+void IRAM_ATTR __wrap_xt_unhandled_exception(void *frame) {
+    task_info_t *task_info = get_task_info();
+    if (task_info) {
+        esp_rom_printf("Task %u caused an unhandled exception. Killing\n", task_info->pid);
+        __asm__ volatile("csrw mepc, %0\n\t" // Set return address
+                         "mret\n\t"
+                         :
+                         : "r"(task_graveyard)
+                         : "t0", "memory");
+    }
+    __real_xt_unhandled_exception(frame);
+}
+
 
 static pid_t pid_allocate() {
     if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {

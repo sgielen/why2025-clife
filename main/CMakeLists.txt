@@ -45,7 +45,10 @@ add_custom_target(generated_symbols
 )
 
 add_dependencies(${COMPONENT_LIB} generated_symbols)
-target_link_libraries(${COMPONENT_LIB} PRIVATE m g "-Wl,--wrap=esp_panic_handler")
+target_link_libraries(${COMPONENT_LIB} PRIVATE m g 
+	"-Wl,--wrap=esp_panic_handler"
+	"-Wl,--wrap=xt_unhandled_exception"
+	)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
 	USE_DL_PREFIX
 	HAVE_MORECORE=1
