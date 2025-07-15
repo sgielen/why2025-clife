@@ -21,6 +21,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "khash.h"
+#include "memory.h"
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -36,10 +37,6 @@ KHASH_MAP_INIT_INT(restable, int);
 #define MAX_PID         127
 #define MIN_STACK_SIZE  8192
 
-// We want negative numbers for error conditions
-#define PID_T_TYPE int16_t
-typedef PID_T_TYPE why_pid_t;
-
 typedef enum { RES_ICONV_OPEN, RES_REGCOMP, RES_OPEN, RES_RESOURCE_TYPE_MAX } task_resource_type_t;
 
 typedef enum {
@@ -54,40 +51,47 @@ typedef struct {
 } file_handle_t;
 
 typedef struct task_info {
-    why_pid_t    pid;
+    // Pointers
     TaskHandle_t handle;
     khash_t(restable) * resources[RES_RESOURCE_TYPE_MAX];
-
-    struct malloc_state malloc_state;
+    allocation_range_t *allocations;
+    void               *data;
+    char               *buffer;
+    char              **argv;
+    char              **argv_back;
+    char               *term;
+    char               *strtok_saveptr;
     uintptr_t           heap_start;
     uintptr_t           heap_end;
-    size_t              heap_size;
-
-    void       *data;
-    task_type_t type;
-    char       *buffer;
-    bool        buffer_in_rom;
-    int         argc;
-    char      **argv;
-    char      **argv_back;
-    size_t      argv_size;
     void (*task_entry)(struct task_info *task_info);
 
-    size_t        max_memory;
-    size_t        current_memory;
-    size_t        max_files;
-    size_t        current_files;
-    file_handle_t file_handles[MAXFD];
-
+    // Small variables
+    bool         buffer_in_rom;
+    pid_t        pid;
+    int          argc;
     int          _errno;
-    char        *term;
-    char         strerror_buf[STRERROR_BUFLEN];
+    task_type_t  type;
+    size_t       heap_size;
+    size_t       argv_size;
+    size_t       max_memory;
+    size_t       current_memory;
+    size_t       max_files;
+    size_t       current_files;
     unsigned int seed;
-    char        *strtok_saveptr;
-    char         asctime_buf[26];
-    char         ctime_buf[26];
-    struct tm    gmtime_tm;
-    struct tm    localtime_tm;
+
+    // Buffers
+    file_handle_t file_handles[MAXFD];
+    char          strerror_buf[STRERROR_BUFLEN];
+    char          asctime_buf[26];
+    char          ctime_buf[26];
+
+    // Structured
+    struct tm            gmtime_tm __attribute__((aligned(8)));
+    struct tm            localtime_tm __attribute__((aligned(8)));
+    struct malloc_state  malloc_state __attribute__((aligned(8)));
+    struct malloc_params malloc_params __attribute__((aligned(8)));
+
+    void *pad; // Fore debugging
 } task_info_t;
 
 __attribute__((always_inline)) inline static task_info_t *get_task_info() {
@@ -96,7 +100,7 @@ __attribute__((always_inline)) inline static task_info_t *get_task_info() {
     return task_info;
 }
 
-void      task_init();
-why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
-void      task_record_resource_alloc(task_resource_type_t type, void *ptr);
-void      task_record_resource_free(task_resource_type_t type, void *ptr);
+void  task_init();
+pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
+void  task_record_resource_alloc(task_resource_type_t type, void *ptr);
+void  task_record_resource_free(task_resource_type_t type, void *ptr);

@@ -52,7 +52,7 @@ device_t *device_get(char const *name) {
 }
 
 void device_init() {
-    ESP_LOGI(TAG, "Initializing");
+    ESP_DRAM_LOGI(DRAM_STR("device_init"), "Initializing");
 
     device_table      = kh_init(devtable);
     device_table_lock = xSemaphoreCreateMutex();

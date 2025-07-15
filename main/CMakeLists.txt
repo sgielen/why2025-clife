@@ -7,6 +7,7 @@ idf_component_register(
 	 "logical_names.c"
 	 "memory.c"
 	 "pathfuncs.c"
+	 "static-buddy.c"
 	 "task.c"
 	 "thirdparty/dlmalloc.c"
 	 "wrapped_funcs.c"
@@ -15,10 +16,12 @@ idf_component_register(
 	 ${CMAKE_CURRENT_SOURCE_DIR}/
 	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     EMBED_FILES
-    	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
+#    	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_a.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
      PRIV_REQUIRES
         "esp_mm"
 	"esp_psram"
@@ -42,7 +45,7 @@ add_custom_target(generated_symbols
 )
 
 add_dependencies(${COMPONENT_LIB} generated_symbols)
-target_link_libraries(${COMPONENT_LIB} PRIVATE m g)
+target_link_libraries(${COMPONENT_LIB} PRIVATE m g "-Wl,--wrap=esp_panic_handler")
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
 	USE_DL_PREFIX
 	HAVE_MORECORE=1
@@ -52,6 +55,9 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
 	MORECORE_CONTIGUOUS=1
 	NO_MALLINFO
 	malloc_getpagesize=0x10000
+)
+target_compile_options(${COMPONENT_LIB} PRIVATE
+	-Wno-empty-body	
 )
 
 set(image ../fatfs_image)

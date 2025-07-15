@@ -1,4 +1,8 @@
 dependencies:
+  freertos:
+    override_path: "../components/freertos"
+  esp_psram:
+    override_path: "../components/esp_psram"
   elf_loader:
     version: "1.*"
     override_path: "../components/elf_loader"

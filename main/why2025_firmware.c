@@ -14,23 +14,37 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 #include "device.h"
 #include "drivers/fatfs.h"
 #include "drivers/tty.h"
 #include "elf_symbols.h"
+#include "esp_debug_helpers.h"
 #include "esp_log.h"
 #include "esp_mmu_map.h"
+#include "esp_private/panic_internal.h"
 #include "esp_psram.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "hal/cache_hal.h"
+#include "hal/cache_ll.h"
+#include "hal/cache_types.h"
+#include "hal/mmu_hal.h"
+#include "hal/mmu_ll.h"
+#include "hal/mmu_types.h"
 #include "logical_names.h"
+#include "memory.h"
 #include "task.h"
 
 #include <string.h>
+
+extern void        spi_flash_enable_interrupts_caches_and_other_cpu(void);
+extern void        spi_flash_disable_interrupts_caches_and_other_cpu(void);
+extern void        __real_esp_panic_handler(panic_info_t *info);
 static void const *__keep_symbol __attribute__((used)) = &elf_find_sym;
+static char const *TAG                                 = "why2025_main";
 
-static char const *TAG = "why2025_main";
-
+#if 0
 extern uint8_t const test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
 extern uint8_t const test_elf_a_end[] asm("_binary_test_basic_a_elf_end");
 extern uint8_t const test_elf_b_start[] asm("_binary_test_basic_b_elf_start");
@@ -39,29 +53,36 @@ extern uint8_t const test_elf_c_start[] asm("_binary_test_basic_c_elf_start");
 extern uint8_t const test_elf_c_end[] asm("_binary_test_basic_c_elf_end");
 extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
+#endif
+extern uint8_t const test_elf_bench_a_start[] asm("_binary_bench_basic_a_elf_start");
+extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end");
+extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
+extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end");
+
+void IRAM_ATTR __wrap_esp_panic_handler(panic_info_t *info) {
+    task_info_t *task_info = get_task_info();
+    if (task_info) {
+        esp_rom_printf("Crashing in task: %u\n", task_info->pid);
+    } else {
+        esp_rom_printf("Crashing in BadgeVMS\n");
+    }
+
+    __real_esp_panic_handler(info);
+}
 
 int app_main(void) {
-    esp_psram_init();
-    esp_mmu_map_dump_mapped_blocks(stdout);
-    // void *out_ptr;
-    // esp_mmu_map(0x48000000, 16384, MMU_TARGET_PSRAM0, MMU_MEM_CAP_READ | MMU_MEM_CAP_WRITE | MMU_MEM_CAP_8BIT, 0,
-    // &out_ptr); printf("Got pointer: %p\n", out_ptr); esp_mmu_map_dump_mapped_blocks(stdout);
+    printf("BadgeVMS Initializing...\n");
 
-    // printf("Attempting to write to pointer\n");
-    //((char*)out_ptr)[0] = 'A';
-    // printf("Attempting to read from pointer\n");
-    // printf("Attempting to read from pointer: %c\n", ((char*)out_ptr)[0]);
-
+    memory_init();
     logical_names_system_init();
     device_init();
     task_init();
 
     device_register("TT01", tty_create(true, true));
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
-
     logical_name_set("SEARCH", "FLASH0:[SUBDIR], FLASH0:[SUBDIR.ANOTHER]", false);
 
-    printf("Hello ESP32P4 firmware\n");
+    printf("BadgeVMS is ready\n");
 
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a);
 
@@ -69,23 +90,29 @@ int app_main(void) {
     argv[0]     = strdup("test_elf_c");
     argv[1]     = strdup("argv[xxx]");
 
-    // for (int i = 1; i < 270; ++i) {
-    sprintf(argv[1], "argv[%d]", 0);
-    why_pid_t pida = run_task(test_elf_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-    ESP_LOGI(TAG, "Started task with pid %i", pida);
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    //}
-    // why_pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
+    while (1) {
+        for (int i = 1; i < 21; ++i) {
+            sprintf(argv[1], "argv[%d]", 0);
+            // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+            // ESP_LOGI(TAG, "Started task with pid %i", pida);
+            pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+            ESP_LOGI(TAG, "Started task with pid %i", pidb);
+            // vTaskDelay(500 / portTICK_PERIOD_MS);
+        }
+        vTaskDelay(60000 / portTICK_PERIOD_MS);
+    }
+    // pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a);
     //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b);
 
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    while (1) {
-        fprintf(stderr, ".");
-        fflush(stderr);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    };
+    vTaskDelay(30000 / portTICK_PERIOD_MS);
+    esp_restart();
+    // while (1) {
+    //     fprintf(stderr, ".");
+    //     fflush(stderr);
+    //     vTaskDelay(5000 / portTICK_PERIOD_MS);
+    // };
 
 #if 0
     vTaskDelay(5000 / portTICK_PERIOD_MS);

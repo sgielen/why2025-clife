@@ -871,11 +871,13 @@ simple_function:
   - ynf
 
 simple_function_extern:
-  - __ltdf2
-  - __fixunsdfsi
-  - __gtdf2
-  - __floatunsidf
   - __divdf3
+  - __fixdfsi
+  - __fixunsdfsi
+  - __floatsidf
+  - __floatunsidf
+  - __gtdf2
+  - __ltdf2
 
 simple_object:
 
@@ -907,6 +909,7 @@ wrapped_function:
   - ftello
   - fwrite
   - getenv
+  - getpid
   - gmtime
   - iconv_close
   - iconv_open

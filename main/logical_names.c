@@ -14,6 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define TAG logical_names
+
 #ifndef ESP_LOGE
 #define ESP_LOGE(tag, ...)                                                                                             \
     do {                                                                                                               \
@@ -21,8 +23,6 @@
         fprintf(stderr, "\n");                                                                                         \
     } while (0)
 #endif
-
-#define TAG logical_names
 
 #include "logical_names.h"
 

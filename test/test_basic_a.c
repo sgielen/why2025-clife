@@ -19,10 +19,9 @@ __asm__(
 int main(int argc, char *argv[]) {
 	fprintf(stdout, "Hello ELF world A!\n");
 
-    {
-    void* x = malloc(256 * 1024);
-    printf("Got pointer %p\n", x);
-    }
+    void* x1 = malloc(2 * 1024 * 1024);
+    printf("Got pointer %p\n", x1);
+
     FILE *f = fopen("FLASH0:TESTFILE", "r");
     printf("fopen: %p\n", f);
     if (f) {
@@ -34,10 +33,8 @@ int main(int argc, char *argv[]) {
         fclose(f);
     }
 
-    {
-    void* x = malloc(256 * 1024);
-    printf("Got pointer %p\n", x);
-    }
+    void* x2 = malloc(2 * 1024 * 1024);
+    printf("Got pointer %p\n", x2);
 
     //f = fopen("SEARCH:ANOTHERFILE.NAME", "r");
     f = fopen("SEARCH:NONEXISTENT", "r");
@@ -53,10 +50,9 @@ int main(int argc, char *argv[]) {
         printf("********** Failed to open File (%s)!\n", strerror(errno));
     }
 
-    {
-    void* x = malloc(256 * 1024);
-    printf("Got pointer %p\n", x);
-    }
+    void* x3 = malloc(2 * 1024 * 1024);
+    printf("Got pointer %p\n", x3);
+
     f = fopen("FLASH0:[SUBDIR.ANOTHER]NEW_FILE", "w+");
     printf("fopen: %p\n", f);
     if (f) {
@@ -75,9 +71,14 @@ int main(int argc, char *argv[]) {
         x[r] = '\0';
         printf("String: %s\n", x);
     }
-    {
-    void* x = malloc(256 * 1024);
-    printf("Got pointer %p\n", x);
-    }
+
+    void* x4 = malloc(2 * 1024 * 1024);
+    printf("Got pointer %p\n", x4);
+
+    free(x3);
+    free(x4);
+    free(x1);
+    free(x2);
+
 	return 0;
 }

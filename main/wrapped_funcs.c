@@ -125,31 +125,31 @@ int why_atexit(void (*function)(void)) {
 }
 
 void IRAM_ATTR *why_malloc(size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("malloc", "Calling malloc(%zi) from task %d", size, task_info->pid);
+    // task_info_t *task_info = get_task_info();
+    //  ESP_LOGI("malloc", "Calling malloc(%zi) from task %d", size, task_info->pid);
     void *ptr = dlmalloc(size);
 
-    ESP_LOGI("malloc", "Calling malloc(%zi) from task %d, returning %p", size, task_info->pid, ptr);
+    // ESP_LOGI("malloc", "Calling malloc(%zi) from task %d, returning %p", size, task_info->pid, ptr);
     return ptr;
 }
 
 void IRAM_ATTR *why_calloc(size_t nmemb, size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("calloc", "Calling calloc(%zi, %zi) from task %d", nmemb, size, task_info->pid);
+    // task_info_t *task_info = get_task_info();
+    // ESP_LOGI("calloc", "Calling calloc(%zi, %zi) from task %d", nmemb, size, task_info->pid);
     void *ptr = dlcalloc(nmemb, size);
     return ptr;
 }
 
 void IRAM_ATTR *why_realloc(void *_Nullable ptr, size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("realloc", "Calling realloc(%p, %zi) from task %d", ptr, size, task_info->pid);
+    // task_info_t *task_info = get_task_info();
+    // ESP_LOGI("realloc", "Calling realloc(%p, %zi) from task %d", ptr, size, task_info->pid);
     void *new_ptr = dlrealloc(ptr, size);
     return new_ptr;
 }
 
 void *why_reallocarray(void *_Nullable ptr, size_t nmemb, size_t size) {
-    task_info_t *task_info = get_task_info();
-    ESP_LOGI("reallocarray", "Calling reallocarray(%p, %zi, %zi) from task %d", ptr, nmemb, size, task_info->pid);
+    // task_info_t *task_info = get_task_info();
+    // ESP_LOGI("reallocarray", "Calling reallocarray(%p, %zi, %zi) from task %d", ptr, nmemb, size, task_info->pid);
     void *new_ptr = dlrealloc(ptr, nmemb * size);
     return new_ptr;
 }
@@ -224,7 +224,7 @@ char *why_strndup(char const *s, size_t n) {
 
 ssize_t why_write(int fd, void const *buf, size_t count) {
     task_info_t *task_info = get_task_info();
-    ESP_LOGI("why_write", "Calling write from task %p fd = %i count = %zi", task_info->handle, fd, count);
+    ESP_LOGD("why_write", "Calling write from task %p fd = %i count = %zi", task_info->handle, fd, count);
     if (task_info->file_handles[fd].device->_write) {
         return task_info->file_handles[fd]
             .device->_write(task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd, buf, count);
@@ -360,4 +360,9 @@ int why_close(int fd) {
 out:
     task_info->_errno = EBADF;
     return -1;
+}
+
+pid_t why_getpid(void) {
+    task_info_t *task_info = get_task_info();
+    return task_info->pid;
 }

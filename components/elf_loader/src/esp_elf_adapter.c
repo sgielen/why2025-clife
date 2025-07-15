@@ -12,6 +12,9 @@
 #include "soc/soc.h"
 #include "private/elf_platform.h"
 
+extern void *why_malloc(size_t size);
+extern void why_free(void *_Nullable ptr);
+
 #ifdef CONFIG_ELF_LOADER_LOAD_PSRAM
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #define OFFSET_TEXT_VALUE   (SOC_IROM_LOW - SOC_DROM_LOW)
@@ -47,7 +50,8 @@ void *esp_elf_malloc(uint32_t n, bool exec)
 #endif
 #endif
 
-    return heap_caps_malloc(n, caps);
+    //return heap_caps_malloc(n, caps);
+    return why_malloc(n);
 }
 
 /**
@@ -59,7 +63,8 @@ void *esp_elf_malloc(uint32_t n, bool exec)
  */
 void esp_elf_free(void *ptr)
 {
-    heap_caps_free(ptr);
+    //heap_caps_free(ptr);
+    why_free(ptr);
 }
 
 /**

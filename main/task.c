@@ -27,6 +27,7 @@
 #include "hal/mmu_types.h"
 #include "hash_helper.h"
 #include "khash.h"
+#include "static-buddy.h"
 
 #include <stdatomic.h>
 
@@ -36,13 +37,15 @@
 
 extern void spi_flash_enable_interrupts_caches_and_other_cpu(void);
 extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
+extern void remap_task(task_info_t *task_info);
+extern void unmap_task(task_info_t *task_info);
 
 static char const *TAG = "task";
 
 // Tracks free PIDs. Note that free PIDs are marked as 1, not 0!
 static uint32_t          pid_free_bitmap[NUM_PIDS / 32];
 static SemaphoreHandle_t pid_free_bitmap_lock = NULL;
-static why_pid_t         next_pid;
+static pid_t             next_pid;
 
 // Process table, each process gets a PID, which we track here.
 static task_info_t      *process_table[NUM_PIDS];
@@ -51,16 +54,16 @@ static SemaphoreHandle_t process_table_lock = NULL;
 static TaskHandle_t  cleanup_task_handle;
 static QueueHandle_t cleanup_task_queue;
 
-static why_pid_t pid_allocate() {
+static pid_t pid_allocate() {
     if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get pid table mutex");
         abort();
     }
 
     // First see if our next pid is free
-    why_pid_t pid      = next_pid;
-    uint32_t  word_idx = pid / 32;
-    uint32_t  bit_idx  = pid % 32;
+    pid_t    pid      = next_pid;
+    uint32_t word_idx = pid / 32;
+    uint32_t bit_idx  = pid % 32;
 
     if (bitcheck(pid_free_bitmap[word_idx], bit_idx)) {
         // next_pid is free. claim it.
@@ -106,7 +109,7 @@ error:
     return pid;
 }
 
-static void pid_free(why_pid_t pid) {
+static void pid_free(pid_t pid) {
     uint32_t word_idx = pid / 32;
     uint32_t bit_idx  = pid % 32;
 
@@ -146,15 +149,17 @@ static void task_killed(int idx, void *ti) {
     task_info_t *task_info = ti;
 
     BaseType_t higher_priority_task_woken = pdFALSE;
-    why_pid_t  pid                        = task_info->pid;
+    pid_t      pid                        = task_info->pid;
     xQueueSendFromISR(cleanup_task_queue, &pid, &higher_priority_task_woken);
     portYIELD_FROM_ISR(higher_priority_task_woken);
 }
 
 static task_info_t *task_info_init() {
     task_info_t *task_info = malloc(sizeof(task_info_t));
-
-    ESP_LOGI(TAG, "Creating task_info %p for task %d", task_info, task_info->pid);
+    if (!task_info) {
+        ESP_LOGE(TAG, "Out of memory trying to allocate task info");
+        return NULL;
+    }
 
     memset(task_info, 0, sizeof(task_info_t));
 
@@ -170,7 +175,6 @@ static task_info_t *task_info_init() {
     for (int i = 0; i < RES_RESOURCE_TYPE_MAX; ++i) {
         task_info->resources[i] = kh_init(restable);
     }
-
 
     return task_info;
 }
@@ -198,10 +202,6 @@ static void task_info_delete(task_info_t *task_info) {
                 task_resource_type_t type = kh_value(task_info->resources[i], k);
 
                 switch (type) {
-                    case RES_MALLOC:
-                        ESP_LOGI(TAG, "Cleaning up malloc %p", ptr);
-                        heap_caps_free(ptr);
-                        break;
                     case RES_ICONV_OPEN:
                         ESP_LOGI(TAG, "Cleaning up iconv %p", ptr);
                         iconv_close(ptr);
@@ -228,7 +228,11 @@ static void task_info_delete(task_info_t *task_info) {
 
 static void elf_task(task_info_t *task_info) {
     int        ret;
-    esp_elf_t *elf  = malloc(sizeof(esp_elf_t));
+    esp_elf_t *elf = malloc(sizeof(esp_elf_t));
+    if (!elf) {
+        ESP_LOGE(TAG, "Out of memory trying to allocate elf structure");
+        return;
+    }
     task_info->data = elf;
 
     uint32_t vmem = why_elf_get_vmem_requirements((uint8_t const *)task_info->buffer);
@@ -259,8 +263,7 @@ static void elf_task(task_info_t *task_info) {
     return;
 
 out:
-    esp_elf_deinit(elf);
-    free(elf);
+    // All allocations will be cleaned up in the cleanup_task
 }
 
 // This is the function that runs inside the Task
@@ -272,6 +275,9 @@ static void generic_task(void *ti) {
     process_table_add_task(task_info);
     vTaskSetThreadLocalStoragePointerAndDelCallback(handle, 0, task_info, task_killed);
 
+    // ESP_LOGI(TAG, "Setting watchpoint on %p core %i", &task_info->pad, esp_cpu_get_core_id());
+    // esp_cpu_set_watchpoint(0, &task_info->pad, 4, ESP_CPU_WATCHPOINT_STORE);
+
     // YOLO
     task_info->task_entry(task_info);
 
@@ -279,7 +285,7 @@ static void generic_task(void *ti) {
 }
 
 static void IRAM_ATTR NOINLINE_ATTR cleanup_task(void *ignored) {
-    why_pid_t dead_pid;
+    pid_t dead_pid;
 
     while (1) {
         // Block until a task dies
@@ -290,22 +296,27 @@ static void IRAM_ATTR NOINLINE_ATTR cleanup_task(void *ignored) {
             if (task_info) {
                 switch (task_info->type) {
                     case TASK_TYPE_ELF:
-                    case TASK_TYPE_ELF_ROM:
-                        // Free ELF structure
-                        esp_elf_deinit(((esp_elf_t *)task_info->data));
-                        free(task_info->data);
-
-                        break;
+                    case TASK_TYPE_ELF_ROM: free(task_info->data); break;
                     default: ESP_LOGE(TAG, "Unknown task type %i", task_info->type);
                 }
 
                 process_table_remove_task(task_info);
                 if (task_info->heap_size) {
-                    uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
-                    spi_flash_disable_interrupts_caches_and_other_cpu();
-                    cache_hal_writeback_addr(task_info->heap_start, task_info->heap_size);
-                    mmu_hal_unmap_region(mmu_id, task_info->heap_start, task_info->heap_size);
-                    spi_flash_enable_interrupts_caches_and_other_cpu();
+                    allocation_range_t *r = task_info->allocations;
+                    r                     = task_info->allocations;
+                    while (r) {
+                        ESP_LOGI(
+                            TAG,
+                            "Deallocating page. vaddr_start = %p, paddr_start = %p, size = %zi",
+                            (void *)r->vaddr_start,
+                            (void *)r->paddr_start,
+                            r->size
+                        );
+                        buddy_deallocate((void *)PADDR_TO_ADDR(r->paddr_start));
+                        allocation_range_t *n = r->next;
+                        free(r);
+                        r = n;
+                    }
                 }
                 task_info_delete(task_info);
 
@@ -337,8 +348,8 @@ void task_record_resource_free(task_resource_type_t type, void *ptr) {
     khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
 }
 
-why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]) {
-    why_pid_t pid = pid_allocate();
+pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]) {
+    pid_t pid = pid_allocate();
     if (pid <= 0) {
         ESP_LOGW(TAG, "Cannot allocate PID for new task");
         return -1;
@@ -347,10 +358,14 @@ why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, cha
     stack_size = stack_size < MIN_STACK_SIZE ? MIN_STACK_SIZE : stack_size;
 
     task_info_t *task_info = task_info_init();
-    task_info->heap_start  = (uintptr_t)0x48000000;
-    task_info->heap_end    = (uintptr_t)0x48000000;
-    task_info->heap_size   = 0;
-    memset(&task_info->malloc_state, 0, sizeof(struct malloc_state));
+    if (!task_info) {
+        return -1;
+    }
+
+    task_info->heap_start = (uintptr_t)VADDR_TASK_START;
+    task_info->heap_end   = task_info->heap_start;
+    // ESP_LOGI(TAG, "Setting watchpoint on %p core %i", &task_info->pad, esp_cpu_get_core_id());
+    // esp_cpu_set_watchpoint(0, &task_info->pad, 4, ESP_CPU_WATCHPOINT_STORE);
 
     task_info->type          = type;
     task_info->pid           = pid;
@@ -364,7 +379,13 @@ why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, cha
         argv_size += strlen(argv[i]) + 1;
     }
 
-    task_info->argv      = malloc(argv_size);
+    task_info->argv = malloc(argv_size);
+    if (!task_info->argv) {
+        ESP_LOGE(TAG, "Out of memory trying to allocate argv buffer");
+        free(task_info);
+        return -1;
+    }
+
     // In case someone tries something clever
     task_info->argv_back = task_info->argv;
     task_info->argv_size = argv_size;
@@ -397,20 +418,32 @@ why_pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, cha
     char task_name[5 + 3 + 1];
     sprintf(task_name, "Task %i", (uint8_t)pid);
 
-    xTaskCreate(generic_task, task_name, stack_size, (void *)task_info, 5, NULL);
+    // xTaskCreate(generic_task, task_name, stack_size, (void *)task_info, 5, NULL);
+    xTaskCreatePinnedToCore(generic_task, task_name, stack_size, (void *)task_info, 5, NULL, 1);
+
     return pid;
 }
 
-task_info_t *get_task_info() {
-    task_info_t *task_info = pvTaskGetThreadLocalStoragePointer(NULL, 0);
+void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
+    task_info_t *task_info = get_task_info();
+    if (task_info) {
+        // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
+        // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
+        remap_task(task_info);
+    }
+}
 
-    ESP_LOGD("get_task_info", "Got process_handle %p == %p", task_info->handle, task_info);
-
-    return task_info;
+void IRAM_ATTR task_switched_out_hook(TaskHandle_t volatile *handle) {
+    task_info_t *task_info = get_task_info();
+    if (task_info) {
+        // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
+        // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
+        unmap_task(task_info);
+    }
 }
 
 void task_init() {
-    ESP_LOGI(TAG, "Initializing");
+    ESP_DRAM_LOGI(DRAM_STR("task_init"), "Initializing");
 
     pid_free_bitmap_lock = xSemaphoreCreateMutex();
     memset(pid_free_bitmap, 0xFF, sizeof(pid_free_bitmap));
@@ -419,8 +452,8 @@ void task_init() {
     process_table_lock = xSemaphoreCreateMutex();
     memset(process_table, 0, sizeof(process_table));
 
-    cleanup_task_queue = xQueueCreate(16, sizeof(why_pid_t));
-    xTaskCreate(cleanup_task, "Task Cleanup Task", 2048, NULL, 10, &cleanup_task_handle);
+    cleanup_task_queue = xQueueCreate(16, sizeof(pid_t));
+    xTaskCreatePinnedToCore(cleanup_task, "Task Cleanup Task", 2048, NULL, 10, &cleanup_task_handle, 0);
 
     next_pid = 1;
 }
