@@ -147,16 +147,26 @@ __attribute__((always_inline)) static inline void
     if (!r)
         return;
 
-    spi_flash_disable_interrupts_caches_and_other_cpu();
     while (r) {
-        // ESP_DRAM_LOGW(DRAM_STR("map_regions"), "Mapping region ptr %p, vaddr_start: %p, paddr_start %p, size %u,
-        // r->next = %p", r, (void*)r->vaddr_start, (void*)r->paddr_start, r->size, r->next);
+        ESP_DRAM_LOGV(
+            DRAM_STR("map_regions"),
+            "Mapping region ptr %p, vaddr_start: %p, paddr_start %p, size %u, r->next = %p",
+            r,
+            (void *)r->vaddr_start,
+            (void *)r->paddr_start,
+            r->size,
+            r->next
+        );
+        spi_flash_disable_interrupts_caches_and_other_cpu();
         why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
+        // Give other tasks a chance
+        spi_flash_enable_interrupts_caches_and_other_cpu();
         total_size += r->size;
         r           = r->next;
     }
 
     // Invalidate all caches at once
+    spi_flash_disable_interrupts_caches_and_other_cpu();
     invalidate_caches(start, total_size);
     spi_flash_enable_interrupts_caches_and_other_cpu();
 }
@@ -200,6 +210,10 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
     if (increment > 0) {
         // Allocating new pages
         uintptr_t vaddr_start = task_info->heap_end;
+
+        if (vaddr_start + increment > SOC_EXTRAM_HIGH) {
+            goto error;
+        }
 
         // Ranges are in reverse order, when we insert our new ranges into
         // the task_info this range needs to be tied to the old head

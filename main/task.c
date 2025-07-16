@@ -27,6 +27,7 @@
 #include "hal/mmu_types.h"
 #include "hash_helper.h"
 #include "khash.h"
+#include "memory.h"
 #include "static-buddy.h"
 
 #include <stdatomic.h>
@@ -43,6 +44,11 @@ extern void __real_xt_unhandled_exception(void *frame);
 
 static char const *TAG = "task";
 
+IRAM_ATTR static task_info_t kernel_task = {
+    .heap_start = KERNEL_HEAP_START,
+    .heap_end   = KERNEL_HEAP_START,
+};
+
 // Tracks free PIDs. Note that free PIDs are marked as 1, not 0!
 static uint32_t          pid_free_bitmap[NUM_PIDS / 32];
 static SemaphoreHandle_t pid_free_bitmap_lock = NULL;
@@ -52,29 +58,34 @@ static pid_t             next_pid;
 static task_info_t      *process_table[NUM_PIDS];
 static SemaphoreHandle_t process_table_lock = NULL;
 
-static TaskHandle_t  cleanup_task_handle;
-static QueueHandle_t cleanup_task_queue;
+static TaskHandle_t  hades_handle;
+static QueueHandle_t hades_queue;
 
 // Try and handle misbehaving tasks
-void IRAM_ATTR task_graveyard() {
+void IRAM_ATTR cerberos() {
     if (xPortInIsrContext()) {
-        ESP_DRAM_LOGE("task_graveyard", "In ISR context, no idea what to do");
+        ESP_DRAM_LOGE("Cerberos", "In ISR context, no idea what to do");
 
     } else {
-        ESP_LOGW("task_graveyard", "In ISR context, no idea what to do");
-        esp_rom_printf("task_graveyard\n");
+        task_info_t *task_info = get_task_info();
+        if (!task_info || !task_info->pid) {
+            ESP_LOGE("Cerberos", "Trying to kill kernel. This is probably bad");
+            return;
+        }
+
+        ESP_LOGW("Cerberos", "Taking task %u to Hades, Woof", task_info->pid);
         vTaskDelete(NULL);
     }
 }
 
 void IRAM_ATTR __wrap_xt_unhandled_exception(void *frame) {
     task_info_t *task_info = get_task_info();
-    if (task_info) {
-        esp_rom_printf("Task %u caused an unhandled exception. Killing\n", task_info->pid);
+    if (task_info && task_info->pid) {
+        esp_rom_printf("Task %u caused an unhandled exception, Cerberos will deal with it\n", task_info->pid);
         __asm__ volatile("csrw mepc, %0\n\t" // Set return address
                          "mret\n\t"
                          :
-                         : "r"(task_graveyard)
+                         : "r"(cerberos)
                          : "t0", "memory");
     }
     __real_xt_unhandled_exception(frame);
@@ -177,7 +188,7 @@ static void task_killed(int idx, void *ti) {
 
     BaseType_t higher_priority_task_woken = pdFALSE;
     pid_t      pid                        = task_info->pid;
-    xQueueSendFromISR(cleanup_task_queue, &pid, &higher_priority_task_woken);
+    xQueueSendFromISR(hades_queue, &pid, &higher_priority_task_woken);
     portYIELD_FROM_ISR(higher_priority_task_woken);
 }
 
@@ -290,7 +301,7 @@ static void elf_task(task_info_t *task_info) {
     return;
 
 out:
-    // All allocations will be cleaned up in the cleanup_task
+    // All allocations will be cleaned up Hades
 }
 
 // This is the function that runs inside the Task
@@ -311,13 +322,13 @@ static void generic_task(void *ti) {
     vTaskDelete(NULL);
 }
 
-static void IRAM_ATTR NOINLINE_ATTR cleanup_task(void *ignored) {
+static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
     pid_t dead_pid;
 
     while (1) {
         // Block until a task dies
-        if (xQueueReceive(cleanup_task_queue, &dead_pid, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI(TAG, "Cleaning up dead task PID %d", dead_pid);
+        if (xQueueReceive(hades_queue, &dead_pid, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGI("HADES", "Stripping PID %d of its worldy possessions", dead_pid);
 
             task_info_t *task_info = process_table[dead_pid];
             if (task_info) {
@@ -333,7 +344,7 @@ static void IRAM_ATTR NOINLINE_ATTR cleanup_task(void *ignored) {
                     r                     = task_info->allocations;
                     while (r) {
                         ESP_LOGI(
-                            TAG,
+                            "HADES",
                             "Deallocating page. vaddr_start = %p, paddr_start = %p, size = %zi",
                             (void *)r->vaddr_start,
                             (void *)r->paddr_start,
@@ -349,9 +360,9 @@ static void IRAM_ATTR NOINLINE_ATTR cleanup_task(void *ignored) {
 
                 // Don't free our PID until the last moment
                 pid_free(dead_pid);
-                ESP_LOGI(TAG, "Task %d cleaned up", dead_pid);
+                ESP_LOGI("HADES", "Task %d escorted to my realm", dead_pid);
             } else {
-                ESP_LOGE(TAG, "Task %d has no task info?", dead_pid);
+                ESP_LOGE("HADES", "Task %d has no task info?", dead_pid);
             }
         }
     }
@@ -453,7 +464,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
 
 void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
     task_info_t *task_info = get_task_info();
-    if (task_info) {
+    if (task_info && task_info->pid) {
         // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
         // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
         remap_task(task_info);
@@ -462,7 +473,7 @@ void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
 
 void IRAM_ATTR task_switched_out_hook(TaskHandle_t volatile *handle) {
     task_info_t *task_info = get_task_info();
-    if (task_info) {
+    if (task_info && task_info->pid) {
         // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
         // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
         unmap_task(task_info);
@@ -472,15 +483,28 @@ void IRAM_ATTR task_switched_out_hook(TaskHandle_t volatile *handle) {
 void task_init() {
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Initializing");
 
+    ESP_DRAM_LOGI(DRAM_STR("task_init"), "Creating PID table");
     pid_free_bitmap_lock = xSemaphoreCreateMutex();
     memset(pid_free_bitmap, 0xFF, sizeof(pid_free_bitmap));
+
     pid_free_bitmap[0] = UINT32_MAX - 1; // PID 0 is the kernel
 
+    ESP_DRAM_LOGI(DRAM_STR("task_init"), "Creating Process table");
     process_table_lock = xSemaphoreCreateMutex();
     memset(process_table, 0, sizeof(process_table));
 
-    cleanup_task_queue = xQueueCreate(16, sizeof(pid_t));
-    xTaskCreatePinnedToCore(cleanup_task, "Task Cleanup Task", 2048, NULL, 10, &cleanup_task_handle, 0);
+    ESP_DRAM_LOGI(
+        DRAM_STR("task_init"),
+        "Registering Kernel task structure at %p - %p",
+        &kernel_task,
+        ((uintptr_t)&kernel_task) + sizeof(task_info_t)
+    );
+    vTaskSetThreadLocalStoragePointer(NULL, 0, &kernel_task);
+    process_table_add_task(&kernel_task);
+
+    ESP_DRAM_LOGI(DRAM_STR("task_init"), "Starting Hades process");
+    hades_queue = xQueueCreate(16, sizeof(pid_t));
+    xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 10, &hades_handle, 0);
 
     next_pid = 1;
 }

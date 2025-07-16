@@ -20,10 +20,36 @@
 #include "esp_log.h"
 #include "soc/soc.h"
 
-#define VADDR_START      SOC_EXTRAM_LOW
-#define VADDR_TASK_START VADDR_START + SOC_MMU_PAGE_SIZE
+/* BadgeVMS memory map for extram
+ *
+ * SOC_EXTRAM_LOW
+ * ...                      Page allocator metadata
+ * SOC_EXTRAM_LOW + 1 page
+ * ...                      Kernel SPIRAM heap
+ * SOC_EXTRAM_LOW + 10MB
+ * ...                      Framebuffers
+ * SOC_EXTRAM_LOW + 20MB
+ * ...                      Unused
+ * SOC_EXTRAM_LOW + 32MB - 1 page
+ * ...                      Guard page
+ * SOC_EXTRAM_LOW + 32MB
+ * ...                      User applications
+ * SOC_EXTRAM_HIGH
+ */
+
+#define PHYSMEM_AMOUNT    (32 * 1024 * 1024)
+#define VADDR_START       SOC_EXTRAM_LOW
+#define VADDR_TASK_START  ((SOC_EXTRAM_LOW + PHYSMEM_AMOUNT) & ~(SOC_MMU_PAGE_SIZE - 1))
+// Allocate 10MB of VADDR space for the kernel
+#define KERNEL_HEAP_SIZE  (((1024 * 1024) * 10) - SOC_MMU_PAGE_SIZE)
+#define KERNEL_HEAP_START SOC_EXTRAM_LOW + SOC_MMU_PAGE_SIZE
+
 #define ADDR_TO_PADDR(a) (a - VADDR_START)
 #define PADDR_TO_ADDR(a) (a + VADDR_START)
+
+#if ((KERNEL_HEAP_START + KERNEL_HEAP_SIZE) > VADDR_TASK_START)
+#error "Kernel Heap overlaps with largest possible user program"
+#endif
 
 typedef struct allocation_range_s {
     uintptr_t                  vaddr_start;

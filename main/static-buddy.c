@@ -294,20 +294,20 @@ void IRAM_ATTR init_pool(void *mem_start, void *mem_end, uint32_t flags) {
     // NOLINTNEXTLINE
     uint32_t max_order_waste = (1 << orders) - pages;
 
-    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Initializing pool %i", memory_pool_num);
+    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Initializing pool %u", memory_pool_num);
     ESP_DRAM_LOGI(
         DRAM_STR("init_pool"),
-        "Found %zi pages, usable %zi, overhead %zi",
+        "Found %lu pages, usable %lu, overhead %lu",
         total_pages,
         pages,
         total_pages - pages
     );
     ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Mem start: %p, pages_start, %p", mem_start, pages_start);
     ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Mem end: %p, pages_end, %p", mem_end, pages_end);
-    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Max orders: %i, max_order_waste: %li", orders, max_order_waste);
-    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Waste starts at: %li", pages - max_order_waste);
-    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Metadata block size: %zi", metadata_block_size);
-    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Metadata free lists size: %zi", metadata_free_lists_size);
+    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Max orders: %u, max_order_waste: %lu", orders, max_order_waste);
+    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Waste starts at: %lu", pages - max_order_waste);
+    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Metadata block size: %lu", metadata_block_size);
+    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Metadata free lists size: %lu", metadata_free_lists_size);
 
     memory_pools[memory_pool_num].flags           = flags;
     memory_pools[memory_pool_num].start           = mem_start;
