@@ -104,12 +104,14 @@ int app_main(void) {
     image.version = PNG_IMAGE_VERSION;
 
     int buf_size = 720 * 720 * 3;
-    png_bytep pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
+    // png_bytep pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
+    lcd_device_t *lcd_device = (lcd_device_t*)device_get("PANEL0");
+    void *pixels;
+    lcd_device->_getfb(lcd_device, &pixels);
     memset(pixels, 0, buf_size);
     for (int i = 0; i < buf_size; i += 3) {
-        pixels[i] = 0xff;
+        ((char*)pixels)[i] = 0xff;
     }
-    lcd_device_t *lcd_device = (lcd_device_t*)device_get("PANEL0");
     lcd_device->_draw(lcd_device, 0, 0, 720, 720, pixels);
 
 #if 0

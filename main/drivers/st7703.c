@@ -144,6 +144,11 @@ void draw(void *dev, int x, int y, int w, int h, void *pixels) {
     esp_lcd_panel_draw_bitmap(device->disp_panel, x, y, w, h, pixels);
 }
 
+void get_framebuffer(void *dev, void **pixels) {
+    st7703_device_t *device = dev;
+    esp_lcd_dpi_panel_get_frame_buffer(device->disp_panel, 1, pixels);
+}
+
 device_t *st7703_create() {
     ESP_LOGI(TAG, "Initializing");
     st7703_device_t *dev  = malloc(sizeof(st7703_device_t));
@@ -151,6 +156,7 @@ device_t *st7703_create() {
     lcd_device_t *lcd_dev = (lcd_device_t*)dev;
 
     lcd_dev->_draw = draw;
+    lcd_dev->_getfb = get_framebuffer;
 
     base_dev->type   = DEVICE_TYPE_LCD;
     base_dev->_open  = NULL;
