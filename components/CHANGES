@@ -1,0 +1,23 @@
+# Changes made to forked components
+
+* esp_lcd_st7703 (https://github.com/espressif/esp-iot-solution/tree/master/components/display/lcd/esp_lcd_st7703)
+  - Change display size to 720 x 720
+    - Matching the WHY2025 panel
+
+* elf_loader (https://github.com/espressif/esp-iot-solution/tree/master/components/elf_loader)
+  - Use BadgeVMS memory management instead of esp-idf
+  - Use BadgeVMS generated symbol list instead of hardcoded symbol list
+
+* freertos (From esp-idf 5.4.2)
+  - Add trace hooks for traceTASK_SWITCHED_IN and traceTASK_SWITCHED_OUT
+    - BadgeVMS uses these tracepoints to swap in and out the MMU mappings for each task
+
+* esp_psram (From esp-idf 5.4.2)
+  - Disable default MMU mapping
+    - BadgeVMS manages all PSRam MMU mappings
+
+* why_stdio (From picolibc)
+  - Rename stdio functions with a why_ prefix
+    - BadgeVMS uses these functions to allow user programs to access resources
+  - Use BadgeVMS malloc/free
+  - Use BadgeVMS open/read/write/lseek
