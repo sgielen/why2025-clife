@@ -63,9 +63,6 @@ static IRAM_ATTR esp_err_t esp_cache_get_alignment(uint32_t heap_caps, size_t *o
 
 IRAM_ATTR void *__wrap_heap_caps_malloc_base(size_t size, uint32_t caps) {
     if (caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlmalloc(size);
     }
     return __real_heap_caps_malloc_base(size, caps);
@@ -73,9 +70,6 @@ IRAM_ATTR void *__wrap_heap_caps_malloc_base(size_t size, uint32_t caps) {
 
 IRAM_ATTR void *__wrap_heap_caps_aligned_alloc_base(size_t alignment, size_t size, uint32_t caps) {
     if (caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlmemalign(alignment, size);
     }
     return __real_heap_caps_aligned_alloc_base(alignment, size, caps);
@@ -83,9 +77,6 @@ IRAM_ATTR void *__wrap_heap_caps_aligned_alloc_base(size_t alignment, size_t siz
 
 IRAM_ATTR void *__wrap_heap_caps_calloc_base(size_t n, size_t size, uint32_t caps) {
     if (caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlcalloc(n, size);
     }
     return __real_heap_caps_calloc_base(n, size, caps);
@@ -93,16 +84,10 @@ IRAM_ATTR void *__wrap_heap_caps_calloc_base(size_t n, size_t size, uint32_t cap
 
 IRAM_ATTR void *__wrap_heap_caps_realloc_base(void *ptr, size_t size, uint32_t caps) {
     if ((uintptr_t)ptr >= KERNEL_HEAP_START && (uintptr_t)ptr < SOC_EXTRAM_HIGH) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlrealloc(ptr, size);
     }
 
     if (!ptr && caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlrealloc(ptr, size);
     }
 
@@ -111,9 +96,6 @@ IRAM_ATTR void *__wrap_heap_caps_realloc_base(void *ptr, size_t size, uint32_t c
 
 IRAM_ATTR void *__wrap_heap_caps_malloc(size_t size, uint32_t caps) {
     if (caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlmalloc(size);
     }
     return __real_heap_caps_malloc(size, caps);
@@ -129,7 +111,6 @@ IRAM_ATTR void *__wrap_heap_caps_realloc_default(void *ptr, size_t size) {
 
 IRAM_ATTR void __wrap_heap_caps_free(void *ptr) {
     if ((uintptr_t)ptr >= KERNEL_HEAP_START && (uintptr_t)ptr < SOC_EXTRAM_HIGH) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
         dlfree(ptr);
     } else {
         __real_heap_caps_free(ptr);
@@ -138,16 +119,10 @@ IRAM_ATTR void __wrap_heap_caps_free(void *ptr) {
 
 IRAM_ATTR void *__wrap_heap_caps_realloc(void *ptr, size_t size, uint32_t caps) {
     if ((uintptr_t)ptr >= KERNEL_HEAP_START && (uintptr_t)ptr < SOC_EXTRAM_HIGH) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlrealloc(ptr, size);
     }
 
     if (!ptr && caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlrealloc(ptr, size);
     }
 
@@ -156,9 +131,6 @@ IRAM_ATTR void *__wrap_heap_caps_realloc(void *ptr, size_t size, uint32_t caps) 
 
 IRAM_ATTR void *__wrap_heap_caps_calloc(size_t n, size_t size, uint32_t caps) {
     if (caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlcalloc(n, size);
     }
     return __real_heap_caps_calloc(n, size, caps);
@@ -166,9 +138,6 @@ IRAM_ATTR void *__wrap_heap_caps_calloc(size_t n, size_t size, uint32_t caps) {
 
 IRAM_ATTR void *__wrap_heap_caps_aligned_alloc(size_t alignment, size_t size, uint32_t caps) {
     if (caps & MALLOC_CAP_SPIRAM) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
-        if (caps & MALLOC_CAP_DMA)
-            ESP_LOGW(__PRETTY_FUNCTION__, "MALLOC_CAP_DMA");
         return dlmemalign(alignment, size);
     }
     return __real_heap_caps_aligned_alloc(alignment, size, caps);
@@ -176,7 +145,6 @@ IRAM_ATTR void *__wrap_heap_caps_aligned_alloc(size_t alignment, size_t size, ui
 
 IRAM_ATTR void __wrap_heap_caps_aligned_free(void *ptr) {
     if ((uintptr_t)ptr >= KERNEL_HEAP_START && (uintptr_t)ptr < SOC_EXTRAM_HIGH) {
-        ESP_LOGW(__PRETTY_FUNCTION__, "called");
         dlfree(ptr);
     } else {
         __real_heap_caps_aligned_free(ptr);
@@ -188,7 +156,6 @@ IRAM_ATTR void *__wrap_heap_caps_aligned_calloc(size_t alignment, size_t n, size
         void *ptr = dlmemalign(alignment, size);
         if (ptr)
             memset(ptr, 0, n * size);
-        ESP_LOGW("aligned_calloc", "align %zi, size %zi * %zi, caps %lu, returning %p", alignment, n, size, caps, ptr);
         return ptr;
     }
     return __real_heap_caps_aligned_calloc(alignment, n, size, caps);

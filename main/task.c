@@ -61,37 +61,6 @@ static SemaphoreHandle_t process_table_lock = NULL;
 static TaskHandle_t  hades_handle;
 static QueueHandle_t hades_queue;
 
-// Try and handle misbehaving tasks
-void IRAM_ATTR cerberos() {
-    if (xPortInIsrContext()) {
-        ESP_DRAM_LOGE("Cerberos", "In ISR context, no idea what to do");
-
-    } else {
-        task_info_t *task_info = get_task_info();
-        if (!task_info || !task_info->pid) {
-            ESP_LOGE("Cerberos", "Trying to kill kernel. This is probably bad");
-            return;
-        }
-
-        ESP_LOGW("Cerberos", "Taking task %u to Hades, Woof", task_info->pid);
-        vTaskDelete(NULL);
-    }
-}
-
-void IRAM_ATTR __wrap_xt_unhandled_exception(void *frame) {
-    task_info_t *task_info = get_task_info();
-    if (task_info && task_info->pid) {
-        esp_rom_printf("Task %u caused an unhandled exception, Cerberos will deal with it\n", task_info->pid);
-        __asm__ volatile("csrw mepc, %0\n\t" // Set return address
-                         "mret\n\t"
-                         :
-                         : "r"(cerberos)
-                         : "t0", "memory");
-    }
-    __real_xt_unhandled_exception(frame);
-}
-
-
 static pid_t pid_allocate() {
     if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get pid table mutex");
@@ -264,8 +233,85 @@ static void task_info_delete(task_info_t *task_info) {
     free(task_info);
 }
 
+// Try and handle misbehaving tasks
+void IRAM_ATTR cerberos() {
+    if (xPortInIsrContext()) {
+        ESP_DRAM_LOGE("CERBEROS", "In ISR context, no idea what to do");
+
+    } else {
+        task_info_t *task_info = get_task_info();
+        if (!task_info || !task_info->pid) {
+            ESP_LOGE("CERBEROS", "Trying to kill kernel. This is probably bad");
+            return;
+        }
+
+        ESP_LOGW("CERBEROS", "Taking task %u to Hades, Woof", task_info->pid);
+        vTaskDelete(NULL);
+    }
+}
+
+void IRAM_ATTR __wrap_xt_unhandled_exception(void *frame) {
+    task_info_t *task_info = get_task_info();
+    if (task_info && task_info->pid) {
+        esp_rom_printf("Task %u caused an unhandled exception, Cerberos will deal with it\n", task_info->pid);
+        __asm__ volatile("csrw mepc, %0\n\t" // Set return address
+                         "mret\n\t"
+                         :
+                         : "r"(cerberos)
+                         : "t0", "memory");
+    }
+    __real_xt_unhandled_exception(frame);
+}
+
+static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
+    pid_t dead_pid;
+
+    while (1) {
+        // Block until a task dies
+        if (xQueueReceive(hades_queue, &dead_pid, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGI("HADES", "Stripping PID %d of its worldy possessions", dead_pid);
+
+            task_info_t *task_info = process_table[dead_pid];
+            if (task_info) {
+                switch (task_info->type) {
+                    case TASK_TYPE_ELF:
+                    case TASK_TYPE_ELF_ROM: free(task_info->data); break;
+                    default: ESP_LOGE(TAG, "Unknown task type %i", task_info->type);
+                }
+
+                process_table_remove_task(task_info);
+                if (task_info->heap_size) {
+                    allocation_range_t *r = task_info->allocations;
+                    r                     = task_info->allocations;
+                    while (r) {
+                        ESP_LOGI(
+                            "HADES",
+                            "Deallocating page. vaddr_start = %p, paddr_start = %p, size = %zi",
+                            (void *)r->vaddr_start,
+                            (void *)r->paddr_start,
+                            r->size
+                        );
+                        buddy_deallocate((void *)PADDR_TO_ADDR(r->paddr_start));
+                        allocation_range_t *n = r->next;
+                        free(r);
+                        r = n;
+                    }
+                }
+                task_info_delete(task_info);
+
+                // Don't free our PID until the last moment
+                pid_free(dead_pid);
+                ESP_LOGI("HADES", "Task %d escorted to my realm", dead_pid);
+            } else {
+                ESP_LOGE("HADES", "Task %d has no task info?", dead_pid);
+            }
+        }
+    }
+}
+
 static void elf_task(task_info_t *task_info) {
     int        ret;
+
     esp_elf_t *elf = malloc(sizeof(esp_elf_t));
     if (!elf) {
         ESP_LOGE(TAG, "Out of memory trying to allocate elf structure");
@@ -320,52 +366,6 @@ static void generic_task(void *ti) {
     task_info->task_entry(task_info);
 
     vTaskDelete(NULL);
-}
-
-static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
-    pid_t dead_pid;
-
-    while (1) {
-        // Block until a task dies
-        if (xQueueReceive(hades_queue, &dead_pid, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI("HADES", "Stripping PID %d of its worldy possessions", dead_pid);
-
-            task_info_t *task_info = process_table[dead_pid];
-            if (task_info) {
-                switch (task_info->type) {
-                    case TASK_TYPE_ELF:
-                    case TASK_TYPE_ELF_ROM: free(task_info->data); break;
-                    default: ESP_LOGE(TAG, "Unknown task type %i", task_info->type);
-                }
-
-                process_table_remove_task(task_info);
-                if (task_info->heap_size) {
-                    allocation_range_t *r = task_info->allocations;
-                    r                     = task_info->allocations;
-                    while (r) {
-                        ESP_LOGI(
-                            "HADES",
-                            "Deallocating page. vaddr_start = %p, paddr_start = %p, size = %zi",
-                            (void *)r->vaddr_start,
-                            (void *)r->paddr_start,
-                            r->size
-                        );
-                        buddy_deallocate((void *)PADDR_TO_ADDR(r->paddr_start));
-                        allocation_range_t *n = r->next;
-                        free(r);
-                        r = n;
-                    }
-                }
-                task_info_delete(task_info);
-
-                // Don't free our PID until the last moment
-                pid_free(dead_pid);
-                ESP_LOGI("HADES", "Task %d escorted to my realm", dead_pid);
-            } else {
-                ESP_LOGE("HADES", "Task %d has no task info?", dead_pid);
-            }
-        }
-    }
 }
 
 void task_record_resource_alloc(task_resource_type_t type, void *ptr) {
@@ -463,7 +463,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
 }
 
 void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
-    task_info_t *task_info = get_task_info();
+    task_info_t *task_info = get_task_info_from_handle(*handle);
     if (task_info && task_info->pid) {
         // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
         // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
@@ -472,7 +472,7 @@ void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
 }
 
 void IRAM_ATTR task_switched_out_hook(TaskHandle_t volatile *handle) {
-    task_info_t *task_info = get_task_info();
+    task_info_t *task_info = get_task_info_from_handle(*handle);
     if (task_info && task_info->pid) {
         // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
         // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);

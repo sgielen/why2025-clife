@@ -399,7 +399,7 @@ void IRAM_ATTR memory_init() {
     spi_flash_disable_interrupts_caches_and_other_cpu();
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Unmapping all of our address space");
-    why_mmu_hal_unmap_region(mmu_id, VADDR_START, SOC_EXTRAM_HIGH - VADDR_START);
+    mmu_ll_unmap_all(mmu_id);
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Map allocator address space");
     mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, VADDR_START, 0x0, SOC_MMU_PAGE_SIZE, &out_len);
@@ -407,13 +407,13 @@ void IRAM_ATTR memory_init() {
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Invalidate allocator address space");
     invalidate_caches(VADDR_START, out_len);
 
+    ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Re-enabling caches and interrupts");
+    spi_flash_enable_interrupts_caches_and_other_cpu();
+
     size_t psram_size = esp_psram_get_size();
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initialzing memory pool");
     init_pool((void *)VADDR_START, (void *)VADDR_START + psram_size, 0);
-
-    ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Re-enabling caches and interrupts");
-    spi_flash_enable_interrupts_caches_and_other_cpu();
 
     print_allocator();
 }

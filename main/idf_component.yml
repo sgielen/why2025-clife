@@ -1,11 +1,15 @@
 dependencies:
-  freertos:
-    override_path: "../components/freertos"
-  esp_psram:
-    override_path: "../components/esp_psram"
+  esp_lcd_st7703:
+    override_path: ../components/esp_lcd_st7703
   elf_loader:
-    version: "1.*"
-    override_path: "../components/elf_loader"
+    version: 1.*
+    override_path: ../components/elf_loader
+  esp_psram:
+    override_path: ../components/esp_psram
+  freertos:
+    override_path: ../components/freertos
   why_stdio:
-    version: "1.*"
-    override_path: "../components/why_stdio"
+    version: 1.*
+    override_path: ../components/why_stdio
+
+  espressif/libpng: ^1.6.39~1

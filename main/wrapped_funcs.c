@@ -238,6 +238,7 @@ ssize_t why_read(int fd, void *buf, size_t count) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("why_read", "Calling read from task %p fd = %i count = %zi", task_info->handle, fd, count);
     if (task_info->file_handles[fd].device->_read) {
+        ESP_LOGD("why_read", "Calling driver _read(%p, %i, %p, %zi)", task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd, buf, count);
         return task_info->file_handles[fd]
             .device->_read(task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd, buf, count);
     } else {
@@ -328,6 +329,8 @@ int why_open(char const *pathname, int flags, mode_t mode) {
         task_info->_errno = ENOMEM;
         goto out;
     }
+
+    ESP_LOGD("why_open", "Got device specific fd %i for task fd %i", dev_fd, fd);
 
     task_info->file_handles[fd].is_open = true;
     task_info->file_handles[fd].dev_fd  = dev_fd;

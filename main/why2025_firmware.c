@@ -18,6 +18,7 @@
 #include "device.h"
 #include "drivers/fatfs.h"
 #include "drivers/tty.h"
+#include "drivers/st7703.h"
 #include "elf_symbols.h"
 #include "esp_debug_helpers.h"
 #include "esp_log.h"
@@ -36,7 +37,11 @@
 #include "memory.h"
 #include "task.h"
 
+#include "png.h"
+
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
 
 extern void        spi_flash_enable_interrupts_caches_and_other_cpu(void);
 extern void        spi_flash_disable_interrupts_caches_and_other_cpu(void);
@@ -59,6 +64,13 @@ extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end")
 extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
 extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end");
 
+extern FILE * why_fopen(const char *pathname, const char *mode);
+extern int why_fseek(FILE *stream, long offset, int whence);
+extern void why_rewind(FILE *stream);
+extern size_t why_fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+extern int why_fclose(FILE *f);
+extern long why_ftell(FILE *stream);
+
 void IRAM_ATTR __wrap_esp_panic_handler(panic_info_t *info) {
     task_info_t *task_info = get_task_info();
     if (task_info) {
@@ -74,10 +86,11 @@ int app_main(void) {
     printf("BadgeVMS Initializing...\n");
 
     memory_init();
-    logical_names_system_init();
-    device_init();
     task_init();
+    device_init();
+    logical_names_system_init();
 
+    device_register("PANEL0", st7703_create());
     device_register("TT01", tty_create(true, true));
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
     logical_name_set("SEARCH", "FLASH0:[SUBDIR], FLASH0:[SUBDIR.ANOTHER]", false);
@@ -85,19 +98,73 @@ int app_main(void) {
     printf("BadgeVMS is ready\n");
 
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a);
+    //
+    png_image image;
+    memset(&image, 0, (sizeof image));
+    image.version = PNG_IMAGE_VERSION;
+
+    int buf_size = 720 * 720 * 3;
+    png_bytep pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
+    memset(pixels, 0, buf_size);
+    for (int i = 0; i < buf_size; i += 3) {
+        pixels[i] = 0xff;
+    }
+    lcd_device_t *lcd_device = (lcd_device_t*)device_get("PANEL0");
+    lcd_device->_draw(lcd_device, 0, 0, 720, 720, pixels);
+
+#if 0
+    FILE *f = why_fopen("FLASH0:BADGEVMS.PNG", "r");
+    if (f) {
+        why_fseek(f, 0, SEEK_END);
+        long size = why_ftell(f);
+        if (size > 0) {
+            why_fseek(f, 0, SEEK_SET);
+            void *imgbuf = heap_caps_malloc(size, MALLOC_CAP_SPIRAM); 
+            if (imgbuf) {
+                ESP_LOGW(TAG, "Got buffer at %p-%pof size %lu", imgbuf, imgbuf + size, size);
+                size_t s = why_fread(imgbuf, size, 1, f);
+                if (s) {
+                    image.format = PNG_FORMAT_RGB;
+                    png_image_begin_read_from_memory(&image, imgbuf, size);
+                    int stride = PNG_IMAGE_ROW_STRIDE(image);
+                    int buf_size = PNG_IMAGE_SIZE(image);
+                    png_bytep pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
+                    ESP_LOGW(TAG, "Decompressed image is %u bytes", PNG_IMAGE_SIZE(image));
+                    png_image_finish_read(&image, NULL, pixels, stride, NULL);
+                    memset(pixels, 0, buf_size);
+                    for (int i = 0; i < buf_size; i += 3) {
+                        pixels[i] = 0xff;
+                    }
+                    free(imgbuf);
+                    why_fclose(f);
+                    lcd_device_t *lcd_device = (lcd_device_t*)device_get("PANEL0");
+                    lcd_device->_draw(lcd_device, 0, 0, 720, 720, pixels);
+                } else {
+                    ESP_LOGW(TAG, "Read failed: %s", strerror(errno));
+                } 
+            } else {
+                ESP_LOGW(TAG, "Malloc(%lu) failed: %s", size, strerror(errno));
+            }
+        } else {
+            ESP_LOGW(TAG, "fseek/ftell failed");
+        }
+    } else {
+        ESP_LOGW(TAG, "Couldn't open image");
+    }
+#endif
 
     char **argv = malloc(sizeof(char *) * 2);
     argv[0]     = strdup("test_elf_c");
     argv[1]     = strdup("argv[xxx]");
 
     while (1) {
-        for (int i = 1; i < 21; ++i) {
+        for (int i = 1; i < 3; ++i) {
             sprintf(argv[1], "argv[%d]", 0);
             // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pida);
             pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             ESP_LOGI(TAG, "Started task with pid %i", pidb);
-            // vTaskDelay(500 / portTICK_PERIOD_MS);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
         }
         vTaskDelay(60000 / portTICK_PERIOD_MS);
     }

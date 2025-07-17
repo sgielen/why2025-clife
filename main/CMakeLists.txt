@@ -4,6 +4,7 @@ idf_component_register(
 	 "device.c"
 	 "drivers/fatfs.c"
 	 "drivers/tty.c"
+	 "drivers/st7703.c"
 	 "logical_names.c"
 	 "memory.c"
 	 "memory_heap_caps.c"
