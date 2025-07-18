@@ -28,7 +28,6 @@
 #include "hash_helper.h"
 #include "khash.h"
 #include "memory.h"
-#include "static-buddy.h"
 
 #include <stdatomic.h>
 
@@ -297,7 +296,7 @@ static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
                             (void *)r->paddr_start,
                             r->size
                         );
-                        buddy_deallocate((void *)PADDR_TO_ADDR(r->paddr_start));
+                        page_deallocate(r->paddr_start);
                         allocation_range_t *n = r->next;
                         free(r);
                         r = n;

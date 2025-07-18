@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "freertos/FreeRTOS.h"
 #include "esp_attr.h"
 
 #include <stdbool.h>
@@ -22,17 +23,6 @@
 #define ALIGN_PAGE_DOWN(x) ALIGN_DOWN(x, PAGE_SIZE)
 
 enum block_type { BLOCK_TYPE_FREE, BLOCK_TYPE_USER, BLOCK_TYPE_PAGE, BLOCK_TYPE_ERROR };
-
-void init_pool(void *mem_start, void *mem_end, uint32_t flags);
-void print_allocator();
-
-void           *buddy_allocate(size_t size, enum block_type type, uint32_t flags);
-// void           *buddy_reallocate(void *ptr, size_t size);
-void            buddy_deallocate(void *ptr);
-// void            buddy_split_allocated(void *ptr);
-enum block_type buddy_get_type(void *ptr);
-size_t          buddy_get_size(void *ptr);
-size_t          buddy_get_free_pages();
 
 typedef struct buddy_block {
     uint8_t             pid;
@@ -59,3 +49,21 @@ typedef struct {
     buddy_block_t *free_lists;
     buddy_block_t *blocks;
 } memory_pool_t;
+
+typedef struct {
+    uint8_t           memory_pool_num;
+    memory_pool_t     memory_pools[MAX_MEMORY_POOLS];
+    SemaphoreHandle_t memory_pool_mutex;
+} allocator_t;
+
+void init_pool(allocator_t *allocator, void *mem_start, void *mem_end, uint32_t flags);
+void print_allocator(allocator_t *allocator);
+
+void           *buddy_allocate(allocator_t *allocator, size_t size, enum block_type type, uint32_t flags);
+// void           *buddy_reallocate(void *ptr, size_t size);
+void            buddy_deallocate(allocator_t *allocator, void *ptr);
+// void            buddy_split_allocated(void *ptr);
+// enum block_type buddy_get_type(void *ptr);
+// size_t          buddy_get_size(void *ptr);
+size_t          buddy_get_free_pages(allocator_t *allocator);
+

@@ -30,7 +30,6 @@
 #include "hal/mmu_types.h"
 #include "soc/ext_mem_defs.h"
 #include "soc/soc.h"
-#include "static-buddy.h"
 #include "task.h"
 
 #include <stdatomic.h>
@@ -38,6 +37,8 @@
 #include <stdlib.h>
 
 #include <errno.h>
+
+static allocator_t page_allocator;
 
 typedef struct {
     uint32_t         start;   // laddr start
@@ -225,7 +226,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
         uint32_t to_allocate   = pages;
         uint32_t allocate_size = pages;
 
-        if (pages > buddy_get_free_pages()) {
+        if (pages > buddy_get_free_pages(&page_allocator)) {
             goto error;
         }
 
@@ -242,7 +243,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
 
             allocation_range_t *new_range = malloc(sizeof(allocation_range_t));
             if (new_range) {
-                new_page = buddy_allocate(allocate_size * SOC_MMU_PAGE_SIZE, 0, 0);
+                new_page = buddy_allocate(&page_allocator, allocate_size * SOC_MMU_PAGE_SIZE, 0, 0);
             }
 
             if (!new_page) {
@@ -251,7 +252,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     allocation_range_t *r = head_range;
                     while (r) {
                         allocation_range_t *n = r->next;
-                        buddy_deallocate((void *)PADDR_TO_ADDR(r->paddr_start));
+                        buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(r->paddr_start));
                         free(r);
                         r = n;
                     }
@@ -326,7 +327,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                 why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
                 spi_flash_enable_interrupts_caches_and_other_cpu();
 
-                buddy_deallocate((void *)PADDR_TO_ADDR(r->paddr_start));
+                buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(r->paddr_start));
 
                 to_decrement          -= r->size;
                 allocation_range_t *n  = r->next;
@@ -355,7 +356,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                 invalidate_caches(r->vaddr_start, r->size);
                 spi_flash_enable_interrupts_caches_and_other_cpu();
 
-                buddy_deallocate((void *)PADDR_TO_ADDR(r->paddr_start + to_decrement));
+                buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(r->paddr_start + to_decrement));
                 to_decrement = 0;
             }
         }
@@ -407,6 +408,10 @@ static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
     }
 }
 
+void page_deallocate(uintptr_t paddr_start) {
+    buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(paddr_start));
+}
+
 void IRAM_ATTR memory_init() {
     for (int i = 0; i < SOC_MMU_LINEAR_ADDRESS_REGION_NUM; i++) {
         ESP_LOGI(TAG, "MMU Region  %u", i);
@@ -454,8 +459,8 @@ void IRAM_ATTR memory_init() {
     spi_flash_enable_interrupts_caches_and_other_cpu();
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initialzing memory pool");
-    init_pool((void *)VADDR_START, (void *)VADDR_START + psram_size, 0);
+    init_pool(&page_allocator, (void *)VADDR_START, (void *)VADDR_START + psram_size, 0);
 
     init_memory_heap_caps();
-    print_allocator();
+    print_allocator(&page_allocator);
 }

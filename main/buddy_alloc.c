@@ -59,12 +59,10 @@
  *
  */
 
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
-#include "static-buddy.h"
+#include "buddy_alloc.h"
 
 #include "bitops.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -74,15 +72,11 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-#define TAG "static-buddy"
+#define TAG "buddy_alloc"
 
-static uint8_t           memory_pool_num = 0;
-static memory_pool_t     memory_pools[MAX_MEMORY_POOLS];
-static SemaphoreHandle_t memory_pool_mutex = NULL;
-
-__attribute__((always_inline)) static inline memory_pool_t *ptr_to_pool(void *ptr) {
-    for (int i = 0; i < memory_pool_num; ++i) {
-        memory_pool_t *pool = &memory_pools[i];
+__attribute__((always_inline)) static inline memory_pool_t *ptr_to_pool(allocator_t *allocator, void *ptr) {
+    for (int i = 0; i < allocator->memory_pool_num; ++i) {
+        memory_pool_t *pool = &allocator->memory_pools[i];
         if (ptr >= pool->pages_start && ptr < pool->pages_end) {
             ESP_LOGD(TAG, "ptr_to_pool(%p) = %i", ptr, i);
             return pool;
@@ -94,11 +88,11 @@ __attribute__((always_inline)) static inline memory_pool_t *ptr_to_pool(void *pt
 }
 
 __attribute__((always_inline)) static inline memory_pool_t *
-    find_pool(uint8_t start_pool, uint8_t order, size_t alloc_size, uint32_t flags) {
+    find_pool(allocator_t *allocator, uint8_t start_pool, uint8_t order, size_t alloc_size, uint32_t flags) {
     (void)flags;
 
-    for (int i = start_pool; i < memory_pool_num; ++i) {
-        memory_pool_t *pool = &memory_pools[i];
+    for (int i = start_pool; i < allocator->memory_pool_num; ++i) {
+        memory_pool_t *pool = &allocator->memory_pools[i];
         if (pool->max_order_free >= order && pool->free_pages >= alloc_size) {
             ESP_LOGD(TAG, "find_pool(%zi, %li) = %i", alloc_size, flags, i);
             return pool;
@@ -251,8 +245,8 @@ static buddy_block_t *try_merge_buddy(memory_pool_t *pool, buddy_block_t *block)
  * Finally we push the free, merged, block to our free list.
  */
 
-void free_block(memory_pool_t *pool, buddy_block_t *block) {
-    xSemaphoreTake(memory_pool_mutex, portMAX_DELAY);
+void free_block(allocator_t *allocator, memory_pool_t *pool, buddy_block_t *block) {
+    xSemaphoreTake(allocator->memory_pool_mutex, portMAX_DELAY);
     buddy_block_t *free_block = block;
 
     while ((block = try_merge_buddy(pool, block))) {
@@ -265,17 +259,17 @@ void free_block(memory_pool_t *pool, buddy_block_t *block) {
     } else {
         list_push_back(&pool->waste_list, free_block);
     }
-    xSemaphoreGive(memory_pool_mutex);
+    xSemaphoreGive(allocator->memory_pool_mutex);
 }
 
-void IRAM_ATTR init_pool(void *mem_start, void *mem_end, uint32_t flags) {
-    if (memory_pool_num >= MAX_MEMORY_POOLS) {
+void IRAM_ATTR init_pool(allocator_t *allocator, void *mem_start, void *mem_end, uint32_t flags) {
+    if (allocator->memory_pool_num >= MAX_MEMORY_POOLS) {
         ESP_LOGW(DRAM_STR("init_pool"), "Out of pools; discarding %p", mem_start);
         return;
     }
 
-    if (!memory_pool_mutex)
-        memory_pool_mutex = xSemaphoreCreateMutex();
+    if (!allocator->memory_pool_mutex)
+        allocator->memory_pool_mutex = xSemaphoreCreateMutex();
 
     size_t  total_pages = (mem_end - mem_start) / PAGE_SIZE;
     uint8_t orders      = get_order(total_pages);
@@ -283,18 +277,18 @@ void IRAM_ATTR init_pool(void *mem_start, void *mem_end, uint32_t flags) {
     size_t metadata_block_size      = sizeof(buddy_block_t) * total_pages;
     size_t metadata_free_lists_size = sizeof(buddy_block_t) * (orders + 1);
 
-    memory_pools[memory_pool_num].free_lists = mem_start;
-    memory_pools[memory_pool_num].blocks =
-        ALIGN_UP(memory_pools[memory_pool_num].free_lists + metadata_free_lists_size, 8);
+    allocator->memory_pools[allocator->memory_pool_num].free_lists = mem_start;
+    allocator->memory_pools[allocator->memory_pool_num].blocks =
+        ALIGN_UP(allocator->memory_pools[allocator->memory_pool_num].free_lists + metadata_free_lists_size, 8);
 
-    void *pages_start = ALIGN_PAGE_UP((void *)memory_pools[memory_pool_num].blocks + metadata_block_size);
+    void *pages_start = ALIGN_PAGE_UP((void *)allocator->memory_pools[allocator->memory_pool_num].blocks + metadata_block_size);
     void *pages_end   = ALIGN_PAGE_DOWN(mem_end);
 
     size_t   pages           = ((size_t)pages_end - (size_t)pages_start) / PAGE_SIZE;
     // NOLINTNEXTLINE
     uint32_t max_order_waste = (1 << orders) - pages;
 
-    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Initializing pool %u", memory_pool_num);
+    ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Initializing pool %u", allocator->memory_pool_num);
     ESP_DRAM_LOGI(
         DRAM_STR("init_pool"),
         "Found %lu pages, usable %lu, overhead %lu",
@@ -309,39 +303,39 @@ void IRAM_ATTR init_pool(void *mem_start, void *mem_end, uint32_t flags) {
     ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Metadata block size: %lu", metadata_block_size);
     ESP_DRAM_LOGI(DRAM_STR("init_pool"), "Metadata free lists size: %lu", metadata_free_lists_size);
 
-    memory_pools[memory_pool_num].flags           = flags;
-    memory_pools[memory_pool_num].start           = mem_start;
-    memory_pools[memory_pool_num].end             = mem_end;
-    memory_pools[memory_pool_num].pages_start     = pages_start;
-    memory_pools[memory_pool_num].pages_end       = pages_end;
-    memory_pools[memory_pool_num].pages           = pages;
-    memory_pools[memory_pool_num].free_pages      = pages;
-    memory_pools[memory_pool_num].max_order       = orders;
-    memory_pools[memory_pool_num].max_order_waste = max_order_waste;
+    allocator->memory_pools[allocator->memory_pool_num].flags           = flags;
+    allocator->memory_pools[allocator->memory_pool_num].start           = mem_start;
+    allocator->memory_pools[allocator->memory_pool_num].end             = mem_end;
+    allocator->memory_pools[allocator->memory_pool_num].pages_start     = pages_start;
+    allocator->memory_pools[allocator->memory_pool_num].pages_end       = pages_end;
+    allocator->memory_pools[allocator->memory_pool_num].pages           = pages;
+    allocator->memory_pools[allocator->memory_pool_num].free_pages      = pages;
+    allocator->memory_pools[allocator->memory_pool_num].max_order       = orders;
+    allocator->memory_pools[allocator->memory_pool_num].max_order_waste = max_order_waste;
 
     // Zero out all of our metadata
-    __builtin_memset(memory_pools[memory_pool_num].start, 0, pages_start - mem_start); // NOLINT
+    __builtin_memset(allocator->memory_pools[allocator->memory_pool_num].start, 0, pages_start - mem_start); // NOLINT
 
     // Initialize our free lists to be empty
     for (int i = 0; i <= orders; ++i) {
-        list_init(&memory_pools[memory_pool_num].free_lists[i]);
+        list_init(&allocator->memory_pools[allocator->memory_pool_num].free_lists[i]);
     }
-    list_init(&memory_pools[memory_pool_num].waste_list);
+    list_init(&allocator->memory_pools[allocator->memory_pool_num].waste_list);
 
     // Mark all of our waste pages as unusable
     for (size_t i = pages - max_order_waste; i < total_pages; ++i) {
-        memory_pools[memory_pool_num].blocks[i].is_waste = true;
+        allocator->memory_pools[allocator->memory_pool_num].blocks[i].is_waste = true;
     }
 
     // Create free block of all available pages
-    memory_pools[memory_pool_num].blocks[0].order = orders;
-    memory_pools[memory_pool_num].blocks[0].next  = &memory_pools[memory_pool_num].blocks[0];
-    memory_pools[memory_pool_num].blocks[0].prev  = &memory_pools[memory_pool_num].blocks[0];
+    allocator->memory_pools[allocator->memory_pool_num].blocks[0].order = orders;
+    allocator->memory_pools[allocator->memory_pool_num].blocks[0].next  = &allocator->memory_pools[allocator->memory_pool_num].blocks[0];
+    allocator->memory_pools[allocator->memory_pool_num].blocks[0].prev  = &allocator->memory_pools[allocator->memory_pool_num].blocks[0];
 
     // Push free block to the free list
-    list_push_back(&memory_pools[memory_pool_num].free_lists[orders], &memory_pools[memory_pool_num].blocks[0]);
-    memory_pools[memory_pool_num].max_order_free = orders;
-    ++memory_pool_num;
+    list_push_back(&allocator->memory_pools[allocator->memory_pool_num].free_lists[orders], &allocator->memory_pools[allocator->memory_pool_num].blocks[0]);
+    allocator->memory_pools[allocator->memory_pool_num].max_order_free = orders;
+    ++allocator->memory_pool_num;
 }
 
 void print_list(memory_pool_t *pool, buddy_block_t *list, size_t *total) {
@@ -361,9 +355,9 @@ void print_list(memory_pool_t *pool, buddy_block_t *list, size_t *total) {
     ESP_LOGI(TAG, "%zu blocks (%zi pages)", blocks, list_total);
 }
 
-void print_allocator() {
-    for (int p = 0; p < memory_pool_num; ++p) {
-        memory_pool_t *pool = &memory_pools[p];
+void print_allocator(allocator_t *allocator) {
+    for (int p = 0; p < allocator->memory_pool_num; ++p) {
+        memory_pool_t *pool = &allocator->memory_pools[p];
         ESP_LOGI(TAG, "Pool %i: ", p);
 
         size_t total = 0;
@@ -385,11 +379,11 @@ void print_allocator() {
     }
 }
 
-size_t buddy_get_free_pages() {
+size_t buddy_get_free_pages(allocator_t *allocator) {
     size_t ret = 0;
 
-    for (int p = 0; p < memory_pool_num; ++p) {
-        memory_pool_t *pool  = &memory_pools[p];
+    for (int p = 0; p < allocator->memory_pool_num; ++p) {
+        memory_pool_t *pool  = &allocator->memory_pools[p];
         ret                 += pool->free_pages;
     }
 
@@ -436,7 +430,7 @@ __attribute__((always_inline)) static inline buddy_block_t *
  * all the way to the size we need, but never any smaller.
  */
 
-void IRAM_ATTR *buddy_allocate(size_t size, enum block_type type, uint32_t flags) {
+void IRAM_ATTR *buddy_allocate(allocator_t *allocator, size_t size, enum block_type type, uint32_t flags) {
     (void)flags;
     ESP_LOGD(TAG, "buddy_allocate(%zi)", size);
     if (!size) {
@@ -451,10 +445,10 @@ void IRAM_ATTR *buddy_allocate(size_t size, enum block_type type, uint32_t flags
 
     ESP_LOGD(TAG, "buddy_allocate(%zi) allocating %zi, pages, order %zi", size, pages, allocation_order);
 
-    xSemaphoreTake(memory_pool_mutex, portMAX_DELAY);
+    xSemaphoreTake(allocator->memory_pool_mutex, portMAX_DELAY);
 
-    for (int i = 0; i < memory_pool_num; ++i) {
-        pool = find_pool(i, allocation_order, pages, 0);
+    for (int i = 0; i < allocator->memory_pool_num; ++i) {
+        pool = find_pool(allocator, i, allocation_order, pages, 0);
         if (!pool) {
             break;
         }
@@ -474,7 +468,7 @@ void IRAM_ATTR *buddy_allocate(size_t size, enum block_type type, uint32_t flags
 
     if (!pool || !block) {
         ESP_LOGW(TAG, "buddy_allocate(%zi) = NULL (OOM) no pool", size);
-        xSemaphoreGive(memory_pool_mutex);
+        xSemaphoreGive(allocator->memory_pool_mutex);
         return NULL;
     }
 
@@ -489,7 +483,7 @@ void IRAM_ATTR *buddy_allocate(size_t size, enum block_type type, uint32_t flags
             --pool->max_order_free;
     }
 
-    xSemaphoreGive(memory_pool_mutex);
+    xSemaphoreGive(allocator->memory_pool_mutex);
 
     pool->free_pages -= (1 << block->order);
     block->type       = type;
@@ -499,7 +493,7 @@ void IRAM_ATTR *buddy_allocate(size_t size, enum block_type type, uint32_t flags
     return retval;
 }
 
-__attribute__((always_inline)) static inline buddy_block_t *buddy_get_block(void *ptr, memory_pool_t **pool) {
+__attribute__((always_inline)) static inline buddy_block_t *buddy_get_block(allocator_t *allocator, void *ptr, memory_pool_t **pool) {
     ESP_LOGD(TAG, "buddy_get_block(%p)", ptr);
     if (!ptr) {
         return NULL;
@@ -512,7 +506,7 @@ __attribute__((always_inline)) static inline buddy_block_t *buddy_get_block(void
         return NULL;
     }
 
-    *pool = ptr_to_pool(ptr);
+    *pool = ptr_to_pool(allocator, ptr);
     if (!*pool) {
         ESP_LOGE(TAG, "buddy_get_block(%p) = Pointer not in a pool", ptr);
         // panic_abort();
@@ -533,11 +527,11 @@ __attribute__((always_inline)) static inline buddy_block_t *buddy_get_block(void
  * This means that at any time we have the largest possible allocation available.
  */
 
-void buddy_deallocate(void *ptr) {
+void buddy_deallocate(allocator_t *allocator, void *ptr) {
     ESP_LOGD(TAG, "buddy_deallocate(%p)", ptr);
 
     memory_pool_t *pool  = NULL;
-    buddy_block_t *block = buddy_get_block(ptr, &pool);
+    buddy_block_t *block = buddy_get_block(allocator, ptr, &pool);
 
     if (!block) {
         return;
@@ -545,7 +539,7 @@ void buddy_deallocate(void *ptr) {
 
     pool->free_pages += (1 << block->order);
     block->type       = BLOCK_TYPE_FREE;
-    free_block(pool, block);
+    free_block(allocator, pool, block);
 }
 
 #if 0
@@ -601,6 +595,7 @@ void *buddy_reallocate(void *ptr, size_t size) {
 }
 #endif
 
+#if 0
 enum block_type buddy_get_type(void *ptr) {
     ESP_LOGD(TAG, "buddy_get_type(%p)", ptr);
 
@@ -627,3 +622,4 @@ size_t buddy_get_size(void *ptr) {
     ESP_LOGD(TAG, "buddy_get_size(%p) returning %i", ptr, (1 << block->order) * PAGE_SIZE);
     return (1 << block->order) * PAGE_SIZE;
 }
+#endif

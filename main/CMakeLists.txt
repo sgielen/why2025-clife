@@ -1,15 +1,15 @@
 idf_component_register(
     SRCS
 	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
+	 "buddy_alloc.c"
 	 "device.c"
 	 "drivers/fatfs.c"
-	 "drivers/tty.c"
 	 "drivers/st7703.c"
+	 "drivers/tty.c"
 	 "logical_names.c"
 	 "memory.c"
 	 "memory_heap_caps.c"
 	 "pathfuncs.c"
-	 "static-buddy.c"
 	 "task.c"
 	 "thirdparty/dlmalloc.c"
 	 "wrapped_funcs.c"

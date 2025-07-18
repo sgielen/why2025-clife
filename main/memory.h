@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "buddy_alloc.h"
 #include "dlmalloc.h"
 #include "esp_log.h"
 #include "soc/soc.h"
@@ -61,4 +62,6 @@ typedef struct allocation_range_s {
 typedef struct task_info task_info_t;
 
 void *why_sbrk(intptr_t increment);
+void  page_deallocate(uintptr_t paddr_start);
+
 void  memory_init();
