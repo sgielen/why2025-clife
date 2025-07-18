@@ -93,7 +93,7 @@ typedef struct task_info {
     unsigned int seed;
 
     task_info_psram_t *psram;
-    void *pad; // For debugging
+    void              *pad; // For debugging
 } task_info_t;
 
 __attribute__((always_inline)) inline static task_info_t *get_task_info() {

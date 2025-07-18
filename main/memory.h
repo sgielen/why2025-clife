@@ -46,9 +46,9 @@
 #define KERNEL_HEAP_START SOC_EXTRAM_LOW + SOC_MMU_PAGE_SIZE
 
 // Allocate 10MB of VADDR space for framebuffers
-#define FRAMEBUFFER_HEAP_SIZE (1024 * 1024 * 10)
+#define FRAMEBUFFER_HEAP_SIZE  (1024 * 1024 * 10)
 #define FRAMEBUFFER_HEAP_START ((SOC_EXTRAM_LOW + FRAMEBUFFER_HEAP_SIZE) & ~(SOC_MMU_PAGE_SIZE - 1))
-#define FRAMEBUFFERS_START FRAMEBUFFFER_HEAP_START + SOC_MMU_PAGE_SIZE
+#define FRAMEBUFFERS_START     FRAMEBUFFFER_HEAP_START + SOC_MMU_PAGE_SIZE
 
 #define ADDR_TO_PADDR(a) (a - VADDR_START)
 #define PADDR_TO_ADDR(a) (a + VADDR_START)
@@ -66,8 +66,8 @@ typedef struct allocation_range_s {
 
 typedef struct task_info task_info_t;
 
-void *why_sbrk(intptr_t increment);
-void  page_deallocate(uintptr_t paddr_start);
+void     *why_sbrk(intptr_t increment);
+void      page_deallocate(uintptr_t paddr_start);
 uintptr_t page_allocate(size_t size);
 
-void  memory_init();
+void memory_init();

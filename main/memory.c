@@ -58,7 +58,7 @@ extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 extern void spi_flash_restore_cache(uint32_t cpuid, uint32_t saved_state);
 extern void spi_flash_disable_cache(uint32_t cpuid, uint32_t saved_state);
 
-extern void init_memory_heap_caps();
+extern void        init_memory_heap_caps();
 static char const *TAG = "memory";
 
 // Copied from ESP-IDF 5.4.2 for speed
@@ -202,6 +202,78 @@ void IRAM_ATTR unmap_task(task_info_t *task_info) {
     }
 }
 
+__attribute__((always_inline)) static inline bool allocate_pages(
+    uintptr_t vaddr_start, uintptr_t pages, allocation_range_t **head_range, allocation_range_t **tail_range
+) {
+    if (pages > buddy_get_free_pages(&page_allocator)) {
+        return false;
+    }
+
+    uint32_t to_allocate   = pages;
+    uint32_t allocate_size = pages;
+
+    // Since we don't know how much contiguous free pages are available we will
+    // have to build up a list of pages to allocate. We want to keep the section with
+    // interrupts disabled as short as possible so do all of the work beforehand.
+    //
+    // We want to have as few mappings as possible, so just allocating 1 at a time is
+    // not an option
+    while (to_allocate) {
+        uintptr_t new_page = 0;
+        allocate_size      = allocate_size > to_allocate ? to_allocate : allocate_size;
+        ESP_LOGI(TAG, "Attempting allocation of size %li pages\n", allocate_size);
+
+        allocation_range_t *new_range = malloc(sizeof(allocation_range_t));
+        if (new_range) {
+            new_page = page_allocate(allocate_size * SOC_MMU_PAGE_SIZE);
+        }
+
+        if (!new_page) {
+            if (allocate_size == 1) {
+                // No more memory
+                allocation_range_t *r = *head_range;
+                while (r) {
+                    allocation_range_t *n = r->next;
+                    page_deallocate(r->paddr_start);
+                    free(r);
+                    r = n;
+                }
+                return false;
+            }
+            // Try again
+            allocate_size -= 1;
+            continue;
+        }
+
+        ESP_LOGI(TAG, "Got new page at address %p", (void *)new_page);
+        // We are the first allocation
+        if (!*tail_range) {
+            *tail_range = new_range;
+        }
+        new_range->vaddr_start = vaddr_start;
+        // The allocator doesn't know the physical ranges
+        new_range->paddr_start = new_page;
+        new_range->size        = allocate_size * SOC_MMU_PAGE_SIZE;
+        new_range->next        = *head_range;
+
+        // We are the new head
+        *head_range  = new_range;
+        // Next allocation will be immediately after us in vaddr
+        vaddr_start += allocate_size * SOC_MMU_PAGE_SIZE;
+        to_allocate -= allocate_size;
+
+        ESP_LOGI(
+            TAG,
+            "New range: vaddr_start = %p, paddr_start = %p, size = %zi",
+            (void *)new_range->vaddr_start,
+            (void *)new_range->paddr_start,
+            new_range->size
+        );
+    }
+
+    return true;
+}
+
 void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
     task_info_t *task_info = get_task_info();
     uintptr_t    old       = task_info->heap_end;
@@ -218,75 +290,16 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
             goto error;
         }
 
-        // Ranges are in reverse order, when we insert our new ranges into
-        // the task_info this range needs to be tied to the old head
         allocation_range_t *head_range = NULL;
         allocation_range_t *tail_range = NULL;
 
-        uint32_t pages         = increment / SOC_MMU_PAGE_SIZE;
-        uint32_t to_allocate   = pages;
-        uint32_t allocate_size = pages;
+        uint32_t pages = increment / SOC_MMU_PAGE_SIZE;
 
-        if (pages > buddy_get_free_pages(&page_allocator)) {
+        // Ranges are in reverse order, when we insert our new ranges into
+        // the task_info this range needs to be tied to the old head
+
+        if (!allocate_pages(vaddr_start, pages, &head_range, &tail_range)) {
             goto error;
-        }
-
-        // Since we don't know how much contiguous free pages are available we will
-        // have to build up a list of pages to allocate. We want to keep the section with
-        // interrupts disabled as short as possible so do all of the work beforehand.
-        //
-        // We want to have as few mappings as possible, so just allocating 1 at a time is
-        // not an option
-        while (to_allocate) {
-            uintptr_t new_page = 0;
-            allocate_size  = allocate_size > to_allocate ? to_allocate : allocate_size;
-            ESP_LOGI(TAG, "Attempting allocation of size %li pages\n", allocate_size);
-
-            allocation_range_t *new_range = malloc(sizeof(allocation_range_t));
-            if (new_range) {
-                new_page = page_allocate(allocate_size * SOC_MMU_PAGE_SIZE);
-            }
-
-            if (!new_page) {
-                if (allocate_size == 1) {
-                    // No more memory
-                    allocation_range_t *r = head_range;
-                    while (r) {
-                        allocation_range_t *n = r->next;
-                        page_deallocate(r->paddr_start);
-                        free(r);
-                        r = n;
-                    }
-                    goto error;
-                }
-                // Try again
-                allocate_size -= 1;
-                continue;
-            }
-
-            ESP_LOGI(TAG, "Got new page at address %p", (void*)new_page);
-            // We are the first allocation
-            if (!tail_range)
-                tail_range = new_range;
-            new_range->vaddr_start = vaddr_start;
-            // The allocator doesn't know the physical ranges
-            new_range->paddr_start = new_page;
-            new_range->size        = allocate_size * SOC_MMU_PAGE_SIZE;
-            new_range->next        = head_range;
-
-            // We are the new head
-            head_range   = new_range;
-            // Next allocation will be immediately after us in vaddr
-            vaddr_start += allocate_size * SOC_MMU_PAGE_SIZE;
-            to_allocate -= allocate_size;
-
-            ESP_LOGI(
-                TAG,
-                "New range: vaddr_start = %p, paddr_start = %p, size = %zi",
-                (void *)new_range->vaddr_start,
-                (void *)new_range->paddr_start,
-                new_range->size
-            );
         }
 
         // Actually map our new memory
@@ -385,10 +398,10 @@ error:
 
 // Cribbed from ESP-IDF 5.4.2
 static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
-    volatile int *spiram = (volatile int *)v_start;
-    size_t p;
-    int errct = 0;
-    int initial_err = -1;
+    int volatile *spiram = (int volatile *)v_start;
+    size_t        p;
+    int           errct       = 0;
+    int           initial_err = -1;
     for (p = 0; p < (size / sizeof(int)); p += 8) {
         spiram[p] = p ^ 0xAAAAAAAA;
     }
@@ -401,7 +414,13 @@ static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
         }
     }
     if (errct) {
-        ESP_DRAM_LOGE(DRAM_STR("memory_test"), "SPI SRAM memory test fail. %d/%d writes failed, first @ %X", errct, size / 32, initial_err + v_start);
+        ESP_DRAM_LOGE(
+            DRAM_STR("memory_test"),
+            "SPI SRAM memory test fail. %d/%d writes failed, first @ %X",
+            errct,
+            size / 32,
+            initial_err + v_start
+        );
         return false;
     } else {
         ESP_DRAM_LOGI(DRAM_STR("memory_test"), "SPI SRAM memory test OK");
@@ -451,7 +470,7 @@ void IRAM_ATTR memory_init() {
     invalidate_caches(VADDR_START, out_len);
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Running memory test");
-    if (! test_psram(VADDR_START, out_len)) {
+    if (!test_psram(VADDR_START, out_len)) {
         spi_flash_enable_interrupts_caches_and_other_cpu();
         esp_restart();
     }
@@ -477,7 +496,14 @@ void IRAM_ATTR memory_init() {
     spi_flash_disable_interrupts_caches_and_other_cpu();
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Map framebuffer allocator address space");
-    mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, FRAMEBUFFER_HEAP_START, framebuffer_page, SOC_MMU_PAGE_SIZE, &out_len);
+    mmu_hal_map_region(
+        mmu_id,
+        MMU_TARGET_PSRAM0,
+        FRAMEBUFFER_HEAP_START,
+        framebuffer_page,
+        SOC_MMU_PAGE_SIZE,
+        &out_len
+    );
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Invalidate allocator address space");
     invalidate_caches(FRAMEBUFFER_HEAP_START, out_len);
@@ -486,7 +512,12 @@ void IRAM_ATTR memory_init() {
     spi_flash_enable_interrupts_caches_and_other_cpu();
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initialzing framebuffer pool");
-    init_pool(&framebuffer_allocator, (void *)FRAMEBUFFER_HEAP_START, (void *)FRAMEBUFFER_HEAP_START + FRAMEBUFFER_HEAP_SIZE, 0);
+    init_pool(
+        &framebuffer_allocator,
+        (void *)FRAMEBUFFER_HEAP_START,
+        (void *)FRAMEBUFFER_HEAP_START + FRAMEBUFFER_HEAP_SIZE,
+        0
+    );
 
     init_memory_heap_caps();
     print_allocator(&page_allocator);

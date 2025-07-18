@@ -14,10 +14,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "freertos/FreeRTOS.h"
 #include "dlmalloc.h"
 #include "esp_attr.h"
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
 #include "hal/cache_hal.h"
 #include "hal/cache_ll.h"
 #include "memory.h"

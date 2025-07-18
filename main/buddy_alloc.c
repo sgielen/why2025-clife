@@ -281,8 +281,9 @@ void IRAM_ATTR init_pool(allocator_t *allocator, void *mem_start, void *mem_end,
     allocator->memory_pools[allocator->memory_pool_num].blocks =
         ALIGN_UP(allocator->memory_pools[allocator->memory_pool_num].free_lists + metadata_free_lists_size, 8);
 
-    void *pages_start = ALIGN_PAGE_UP((void *)allocator->memory_pools[allocator->memory_pool_num].blocks + metadata_block_size);
-    void *pages_end   = ALIGN_PAGE_DOWN(mem_end);
+    void *pages_start =
+        ALIGN_PAGE_UP((void *)allocator->memory_pools[allocator->memory_pool_num].blocks + metadata_block_size);
+    void *pages_end = ALIGN_PAGE_DOWN(mem_end);
 
     size_t   pages           = ((size_t)pages_end - (size_t)pages_start) / PAGE_SIZE;
     // NOLINTNEXTLINE
@@ -329,11 +330,16 @@ void IRAM_ATTR init_pool(allocator_t *allocator, void *mem_start, void *mem_end,
 
     // Create free block of all available pages
     allocator->memory_pools[allocator->memory_pool_num].blocks[0].order = orders;
-    allocator->memory_pools[allocator->memory_pool_num].blocks[0].next  = &allocator->memory_pools[allocator->memory_pool_num].blocks[0];
-    allocator->memory_pools[allocator->memory_pool_num].blocks[0].prev  = &allocator->memory_pools[allocator->memory_pool_num].blocks[0];
+    allocator->memory_pools[allocator->memory_pool_num].blocks[0].next =
+        &allocator->memory_pools[allocator->memory_pool_num].blocks[0];
+    allocator->memory_pools[allocator->memory_pool_num].blocks[0].prev =
+        &allocator->memory_pools[allocator->memory_pool_num].blocks[0];
 
     // Push free block to the free list
-    list_push_back(&allocator->memory_pools[allocator->memory_pool_num].free_lists[orders], &allocator->memory_pools[allocator->memory_pool_num].blocks[0]);
+    list_push_back(
+        &allocator->memory_pools[allocator->memory_pool_num].free_lists[orders],
+        &allocator->memory_pools[allocator->memory_pool_num].blocks[0]
+    );
     allocator->memory_pools[allocator->memory_pool_num].max_order_free = orders;
     ++allocator->memory_pool_num;
 }
@@ -493,7 +499,8 @@ void IRAM_ATTR *buddy_allocate(allocator_t *allocator, size_t size, enum block_t
     return retval;
 }
 
-__attribute__((always_inline)) static inline buddy_block_t *buddy_get_block(allocator_t *allocator, void *ptr, memory_pool_t **pool) {
+__attribute__((always_inline)) static inline buddy_block_t *
+    buddy_get_block(allocator_t *allocator, void *ptr, memory_pool_t **pool) {
     ESP_LOGD(TAG, "buddy_get_block(%p)", ptr);
     if (!ptr) {
         return NULL;
