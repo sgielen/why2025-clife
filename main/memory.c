@@ -238,13 +238,13 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
         // We want to have as few mappings as possible, so just allocating 1 at a time is
         // not an option
         while (to_allocate) {
-            void *new_page = NULL;
+            uintptr_t new_page = 0;
             allocate_size  = allocate_size > to_allocate ? to_allocate : allocate_size;
             ESP_LOGI(TAG, "Attempting allocation of size %li pages\n", allocate_size);
 
             allocation_range_t *new_range = malloc(sizeof(allocation_range_t));
             if (new_range) {
-                new_page = buddy_allocate(&page_allocator, allocate_size * SOC_MMU_PAGE_SIZE, 0, 0);
+                new_page = page_allocate(allocate_size * SOC_MMU_PAGE_SIZE);
             }
 
             if (!new_page) {
@@ -253,7 +253,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     allocation_range_t *r = head_range;
                     while (r) {
                         allocation_range_t *n = r->next;
-                        buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(r->paddr_start));
+                        page_deallocate(r->paddr_start);
                         free(r);
                         r = n;
                     }
@@ -264,13 +264,13 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                 continue;
             }
 
-            ESP_LOGI(TAG, "Got new page at address %p", new_page);
+            ESP_LOGI(TAG, "Got new page at address %p", (void*)new_page);
             // We are the first allocation
             if (!tail_range)
                 tail_range = new_range;
             new_range->vaddr_start = vaddr_start;
             // The allocator doesn't know the physical ranges
-            new_range->paddr_start = (uintptr_t)ADDR_TO_PADDR(new_page);
+            new_range->paddr_start = new_page;
             new_range->size        = allocate_size * SOC_MMU_PAGE_SIZE;
             new_range->next        = head_range;
 
@@ -328,7 +328,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                 why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
                 spi_flash_enable_interrupts_caches_and_other_cpu();
 
-                buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(r->paddr_start));
+                page_deallocate(r->paddr_start);
 
                 to_decrement          -= r->size;
                 allocation_range_t *n  = r->next;
@@ -357,7 +357,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                 invalidate_caches(r->vaddr_start, r->size);
                 spi_flash_enable_interrupts_caches_and_other_cpu();
 
-                buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(r->paddr_start + to_decrement));
+                page_deallocate(r->paddr_start + to_decrement);
                 to_decrement = 0;
             }
         }
@@ -413,6 +413,15 @@ void page_deallocate(uintptr_t paddr_start) {
     buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(paddr_start));
 }
 
+uintptr_t page_allocate(size_t size) {
+    void *ret = buddy_allocate(&page_allocator, size, 0, 0);
+    if (ret) {
+        return ADDR_TO_PADDR((uintptr_t)ret);
+    }
+    // This is fine because page 0 is always used by the allocator itself
+    return 0;
+}
+
 void IRAM_ATTR memory_init() {
     for (int i = 0; i < SOC_MMU_LINEAR_ADDRESS_REGION_NUM; i++) {
         ESP_LOGI(TAG, "MMU Region  %u", i);
@@ -451,7 +460,7 @@ void IRAM_ATTR memory_init() {
     mmu_ll_unmap_all(mmu_id);
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Map allocator address space");
-    mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, VADDR_START, 0x0, SOC_MMU_PAGE_SIZE, &out_len);
+    mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, VADDR_START, 0, SOC_MMU_PAGE_SIZE, &out_len);
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Invalidate allocator address space");
     invalidate_caches(VADDR_START, out_len);
@@ -462,13 +471,13 @@ void IRAM_ATTR memory_init() {
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initialzing memory pool");
     init_pool(&page_allocator, (void *)VADDR_START, (void *)VADDR_START + psram_size, 0);
 
-    void* framebuffer_page = buddy_allocate(&page_allocator, SOC_MMU_PAGE_SIZE, 0, 0);
+    uintptr_t framebuffer_page = page_allocate(SOC_MMU_PAGE_SIZE);
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Disabling caches and interrupts");
     spi_flash_disable_interrupts_caches_and_other_cpu();
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Map framebuffer allocator address space");
-    mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, FRAMEBUFFER_HEAP_START, ADDR_TO_PADDR((uintptr_t)framebuffer_page), SOC_MMU_PAGE_SIZE, &out_len);
+    mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, FRAMEBUFFER_HEAP_START, framebuffer_page, SOC_MMU_PAGE_SIZE, &out_len);
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Invalidate allocator address space");
     invalidate_caches(FRAMEBUFFER_HEAP_START, out_len);

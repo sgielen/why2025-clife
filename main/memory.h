@@ -68,5 +68,6 @@ typedef struct task_info task_info_t;
 
 void *why_sbrk(intptr_t increment);
 void  page_deallocate(uintptr_t paddr_start);
+uintptr_t page_allocate(size_t size);
 
 void  memory_init();
