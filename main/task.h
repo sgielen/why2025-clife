@@ -60,6 +60,8 @@ typedef struct task_info_psram {
     // Structured
     struct tm            gmtime_tm;
     struct tm            localtime_tm;
+    struct malloc_state  malloc_state;
+    struct malloc_params malloc_params;
 } task_info_psram_t;
 
 typedef struct task_info {
@@ -89,10 +91,6 @@ typedef struct task_info {
     size_t       max_files;
     size_t       current_files;
     unsigned int seed;
-
-    // Structured
-    struct malloc_state  malloc_state;
-    struct malloc_params malloc_params;
 
     task_info_psram_t *psram;
     void *pad; // For debugging

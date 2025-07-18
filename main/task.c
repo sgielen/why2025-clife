@@ -44,9 +44,11 @@ extern void __real_xt_unhandled_exception(void *frame);
 
 static char const *TAG = "task";
 
+IRAM_ATTR static task_info_psram_t kernel_task_psram;
 IRAM_ATTR static task_info_t kernel_task = {
     .heap_start = KERNEL_HEAP_START,
     .heap_end   = KERNEL_HEAP_START,
+    .psram      = &kernel_task_psram,
 };
 
 // Tracks free PIDs. Note that free PIDs are marked as 1, not 0!

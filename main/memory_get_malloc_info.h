@@ -7,7 +7,7 @@ __attribute__((always_inline)) static inline IRAM_ATTR struct malloc_state *get_
         ESP_DRAM_LOGE(DRAM_STR("get_malloc_state"), "called without task_info");
         return NULL;
     }
-    return &task_info->malloc_state;
+    return &task_info->psram->malloc_state;
 }
 
 __attribute__((always_inline)) static inline IRAM_ATTR struct malloc_params *get_malloc_params() {
@@ -16,5 +16,5 @@ __attribute__((always_inline)) static inline IRAM_ATTR struct malloc_params *get
         ESP_DRAM_LOGE(DRAM_STR("get_malloc_state"), "called without task_info");
         return NULL;
     }
-    return &task_info->malloc_params;
+    return &task_info->psram->malloc_params;
 }
