@@ -100,12 +100,6 @@ __attribute__((always_inline)) inline static task_info_t *get_task_info() {
     return task_info;
 }
 
-__attribute__((always_inline)) inline static task_info_t *get_task_info_from_handle(TaskHandle_t handle) {
-    task_info_t *task_info = pvTaskGetThreadLocalStoragePointer(handle, 0);
-
-    return task_info;
-}
-
 void  task_init();
 pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
 void  task_record_resource_alloc(task_resource_type_t type, void *ptr);
