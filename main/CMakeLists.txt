@@ -25,7 +25,7 @@ idf_component_register(
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_a.elf"
-#	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
      PRIV_REQUIRES
 	"esp_driver_ppa"
 	"esp_lcd_st7703"

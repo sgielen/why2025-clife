@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
         // Allocate some memory
         char* ptr = malloc(ALLOC_SIZE);
-        if (task_id == 1) {
+        if (task_id == 2) {
             *((char*)((void*)0x4c100000)) = '0';
         }
         if (ptr) {
