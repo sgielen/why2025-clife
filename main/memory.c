@@ -56,6 +56,7 @@ extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 extern void spi_flash_restore_cache(uint32_t cpuid, uint32_t saved_state);
 extern void spi_flash_disable_cache(uint32_t cpuid, uint32_t saved_state);
 
+extern void init_memory_heap_caps();
 static char const *TAG = "memory";
 
 // Copied from ESP-IDF 5.4.2 for speed
@@ -404,7 +405,6 @@ static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
         ESP_DRAM_LOGI(DRAM_STR("memory_test"), "SPI SRAM memory test OK");
         return true;
     }
-
 }
 
 void IRAM_ATTR memory_init() {
@@ -456,5 +456,6 @@ void IRAM_ATTR memory_init() {
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initialzing memory pool");
     init_pool((void *)VADDR_START, (void *)VADDR_START + psram_size, 0);
 
+    init_memory_heap_caps();
     print_allocator();
 }
