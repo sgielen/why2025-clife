@@ -380,6 +380,33 @@ error:
     return (void *)-1;
 }
 
+// Cribbed from ESP-IDF 5.4.2
+static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
+    volatile int *spiram = (volatile int *)v_start;
+    size_t p;
+    int errct = 0;
+    int initial_err = -1;
+    for (p = 0; p < (size / sizeof(int)); p += 8) {
+        spiram[p] = p ^ 0xAAAAAAAA;
+    }
+    for (p = 0; p < (size / sizeof(int)); p += 8) {
+        if (spiram[p] != (p ^ 0xAAAAAAAA)) {
+            errct++;
+            if (errct == 1) {
+                initial_err = p * 4;
+            }
+        }
+    }
+    if (errct) {
+        ESP_DRAM_LOGE(DRAM_STR("memory_test"), "SPI SRAM memory test fail. %d/%d writes failed, first @ %X", errct, size / 32, initial_err + v_start);
+        return false;
+    } else {
+        ESP_DRAM_LOGI(DRAM_STR("memory_test"), "SPI SRAM memory test OK");
+        return true;
+    }
+
+}
+
 void IRAM_ATTR memory_init() {
     for (int i = 0; i < SOC_MMU_LINEAR_ADDRESS_REGION_NUM; i++) {
         ESP_LOGI(TAG, "MMU Region  %u", i);
@@ -391,12 +418,28 @@ void IRAM_ATTR memory_init() {
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initializing PSRAM");
     esp_psram_init();
 
-    // Get our initial page to place our allocator into
+    size_t psram_size = esp_psram_get_size();
+
     uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
     uint32_t out_len;
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Disabling caches and interrupts");
     spi_flash_disable_interrupts_caches_and_other_cpu();
+
+    ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Unmapping all of our address space");
+    mmu_ll_unmap_all(mmu_id);
+
+    ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Mapping all pages for memory test");
+    mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, VADDR_START, 0x0, psram_size, &out_len);
+
+    ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Invalidate all pages for memory test");
+    invalidate_caches(VADDR_START, out_len);
+
+    ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Running memory test");
+    if (! test_psram(VADDR_START, out_len)) {
+        spi_flash_enable_interrupts_caches_and_other_cpu();
+        esp_restart();
+    }
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Unmapping all of our address space");
     mmu_ll_unmap_all(mmu_id);
@@ -409,8 +452,6 @@ void IRAM_ATTR memory_init() {
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Re-enabling caches and interrupts");
     spi_flash_enable_interrupts_caches_and_other_cpu();
-
-    size_t psram_size = esp_psram_get_size();
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initialzing memory pool");
     init_pool((void *)VADDR_START, (void *)VADDR_START + psram_size, 0);
