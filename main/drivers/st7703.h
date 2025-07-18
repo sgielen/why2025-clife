@@ -36,7 +36,7 @@ extern "C" {
             .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,     \
             .dpi_clock_freq_mhz = 58,                        \
             .virtual_channel = 0,                            \
-            .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB888,   \
+            .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,   \
             .num_fbs = 2                                     \
             .video_timing = {                                \
                 .h_size = 720,                               \
@@ -116,7 +116,7 @@ extern "C" {
         .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,     \
         .dpi_clock_freq_mhz = 47,                        \
         .virtual_channel = 0,                            \
-        .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB888,   \
+        .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,   \
         .num_fbs = 2,                                    \
         .video_timing = {                                \
             .h_size = 720,                               \
