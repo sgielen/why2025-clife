@@ -4,8 +4,6 @@ cmake_minimum_required(VERSION 3.16)
 
 include(ExternalProject)
 
-add_subdirectory(test)
-
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(why2025_firmware)
 
