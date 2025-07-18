@@ -111,7 +111,7 @@ static void panel_init(st7703_device_t *device) {
     };
 
     esp_lcd_panel_dev_config_t lcd_dev_config = {
-        .bits_per_pixel          = 24,
+        .bits_per_pixel          = 16,
         // We are actually sending RGB data to the display. For soms reason on the WHY2025 badge
         // this is backwards
         .rgb_ele_order           = LCD_RGB_ELEMENT_ORDER_BGR,
