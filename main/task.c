@@ -162,22 +162,26 @@ static void task_killed(int idx, void *ti) {
 }
 
 static task_info_t *task_info_init() {
-    task_info_t *task_info = malloc(sizeof(task_info_t));
+    task_info_t *task_info = calloc(1, sizeof(task_info_t));
     if (!task_info) {
         ESP_LOGE(TAG, "Out of memory trying to allocate task info");
         return NULL;
     }
 
-    memset(task_info, 0, sizeof(task_info_t));
+    task_info->psram = heap_caps_calloc(1, sizeof(task_info_psram_t), MALLOC_CAP_SPIRAM);
+    if (!task_info->psram) {
+        ESP_LOGE(TAG, "Out of memory trying to allocate task info");
+        free(task_info);
+        return NULL;
+    }
 
-    task_info->term                    = strdup("dumb");
     task_info->current_files           = 3;
-    task_info->file_handles[0].is_open = true;
-    task_info->file_handles[0].device  = device_get("TT01");
-    task_info->file_handles[1].is_open = true;
-    task_info->file_handles[1].device  = device_get("TT01");
-    task_info->file_handles[2].is_open = true;
-    task_info->file_handles[2].device  = device_get("TT01");
+    task_info->psram->file_handles[0].is_open = true;
+    task_info->psram->file_handles[0].device  = device_get("TT01");
+    task_info->psram->file_handles[1].is_open = true;
+    task_info->psram->file_handles[1].device  = device_get("TT01");
+    task_info->psram->file_handles[2].is_open = true;
+    task_info->psram->file_handles[2].device  = device_get("TT01");
 
     for (int i = 0; i < RES_RESOURCE_TYPE_MAX; ++i) {
         task_info->resources[i] = kh_init(restable);
@@ -191,12 +195,12 @@ static void task_info_delete(task_info_t *task_info) {
 
     for (int i = 0; i < MAXFD; ++i) {
         // We sadly can't reuse the why_close code as it must be ran from inside the user task
-        if (task_info->file_handles[i].is_open) {
+        if (task_info->psram->file_handles[i].is_open) {
             ESP_LOGI(TAG, "Cleaning up open filehandle %i", i);
-            if (task_info->file_handles[i].device->_close) {
-                task_info->file_handles[i].device->_close(
-                    task_info->file_handles[i].device,
-                    task_info->file_handles[i].dev_fd
+            if (task_info->psram->file_handles[i].device->_close) {
+                task_info->psram->file_handles[i].device->_close(
+                    task_info->psram->file_handles[i].device,
+                    task_info->psram->file_handles[i].dev_fd
                 );
             }
         }
@@ -229,7 +233,7 @@ static void task_info_delete(task_info_t *task_info) {
     }
 
     free(task_info->argv_back);
-    free(task_info->term);
+    heap_caps_free(task_info->psram);
     free(task_info);
 }
 
@@ -505,6 +509,7 @@ void task_init() {
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Starting Hades process");
     hades_queue = xQueueCreate(16, sizeof(pid_t));
     xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 10, &hades_handle, 0);
+    vTaskSetThreadLocalStoragePointer(hades_handle, 0, &kernel_task);
 
     next_pid = 1;
 }

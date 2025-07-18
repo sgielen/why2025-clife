@@ -40,7 +40,7 @@ static char const *TAG = "wrapped_functions";
 
 char *why_strerror(int errnum) {
     task_info_t *task_info = get_task_info();
-    return strerror_r(errnum, task_info->strerror_buf, STRERROR_BUFLEN);
+    return strerror_r(errnum, task_info->psram->strerror_buf, STRERROR_BUFLEN);
 }
 
 char *why_strtok(char *str, char const *delim) {
@@ -50,22 +50,22 @@ char *why_strtok(char *str, char const *delim) {
 
 char *why_asctime(const struct tm *tm) {
     task_info_t *task_info = get_task_info();
-    return asctime_r(tm, task_info->asctime_buf);
+    return asctime_r(tm, task_info->psram->asctime_buf);
 }
 
 char *why_ctime(time_t const *timep) {
     task_info_t *task_info = get_task_info();
-    return ctime_r(timep, task_info->ctime_buf);
+    return ctime_r(timep, task_info->psram->ctime_buf);
 }
 
 struct tm *why_gmtime(time_t const *timep) {
     task_info_t *task_info = get_task_info();
-    return gmtime_r(timep, &task_info->gmtime_tm);
+    return gmtime_r(timep, &task_info->psram->gmtime_tm);
 }
 
 struct tm *why_localtime(time_t const *timep) {
     task_info_t *task_info = get_task_info();
-    return localtime_r(timep, &task_info->localtime_tm);
+    return localtime_r(timep, &task_info->psram->localtime_tm);
 }
 
 int why_rand() {
@@ -225,9 +225,9 @@ char *why_strndup(char const *s, size_t n) {
 ssize_t why_write(int fd, void const *buf, size_t count) {
     task_info_t *task_info = get_task_info();
     ESP_LOGD("why_write", "Calling write from task %p fd = %i count = %zi", task_info->handle, fd, count);
-    if (task_info->file_handles[fd].device->_write) {
-        return task_info->file_handles[fd]
-            .device->_write(task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd, buf, count);
+    if (task_info->psram->file_handles[fd].device->_write) {
+        return task_info->psram->file_handles[fd]
+            .device->_write(task_info->psram->file_handles[fd].device, task_info->psram->file_handles[fd].dev_fd, buf, count);
     } else {
         ESP_LOGE("why_write", "fd %i has no valid write function", fd);
     }
@@ -237,10 +237,10 @@ ssize_t why_write(int fd, void const *buf, size_t count) {
 ssize_t why_read(int fd, void *buf, size_t count) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("why_read", "Calling read from task %p fd = %i count = %zi", task_info->handle, fd, count);
-    if (task_info->file_handles[fd].device->_read) {
-        ESP_LOGD("why_read", "Calling driver _read(%p, %i, %p, %zi)", task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd, buf, count);
-        return task_info->file_handles[fd]
-            .device->_read(task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd, buf, count);
+    if (task_info->psram->file_handles[fd].device->_read) {
+        ESP_LOGD("why_read", "Calling driver _read(%p, %i, %p, %zi)", task_info->psram->file_handles[fd].device, task_info->psram->file_handles[fd].dev_fd, buf, count);
+        return task_info->psram->file_handles[fd]
+            .device->_read(task_info->psram->file_handles[fd].device, task_info->psram->file_handles[fd].dev_fd, buf, count);
     } else {
         ESP_LOGE("why_read", "fd %i has no valid read function", fd);
     }
@@ -251,9 +251,9 @@ ssize_t why_read(int fd, void *buf, size_t count) {
 off_t why_lseek(int fd, off_t offset, int whence) {
     task_info_t *task_info = get_task_info();
     ESP_LOGI("why_lseek", "Calling lseek from task %p", task_info->handle);
-    if (task_info->file_handles[fd].device->_lseek) {
-        return task_info->file_handles[fd]
-            .device->_lseek(task_info->file_handles[fd].device, task_info->file_handles[fd].dev_fd, offset, whence);
+    if (task_info->psram->file_handles[fd].device->_lseek) {
+        return task_info->psram->file_handles[fd]
+            .device->_lseek(task_info->psram->file_handles[fd].device, task_info->psram->file_handles[fd].dev_fd, offset, whence);
     } else {
         ESP_LOGE("why_lseek", "fd %i has no valid lseek function", fd);
     }
@@ -319,7 +319,7 @@ int why_open(char const *pathname, int flags, mode_t mode) {
     }
 
     for (int i = 0; i < MAXFD; ++i) {
-        if (task_info->file_handles[i].is_open == false) {
+        if (task_info->psram->file_handles[i].is_open == false) {
             fd = i;
             break;
         }
@@ -332,9 +332,9 @@ int why_open(char const *pathname, int flags, mode_t mode) {
 
     ESP_LOGD("why_open", "Got device specific fd %i for task fd %i", dev_fd, fd);
 
-    task_info->file_handles[fd].is_open = true;
-    task_info->file_handles[fd].dev_fd  = dev_fd;
-    task_info->file_handles[fd].device  = device;
+    task_info->psram->file_handles[fd].is_open = true;
+    task_info->psram->file_handles[fd].dev_fd  = dev_fd;
+    task_info->psram->file_handles[fd].device  = device;
 
 out:
     ESP_LOGI("why_open", "Calling open from task %p for path %s returning %i", task_info->handle, pathname, fd);
@@ -349,12 +349,12 @@ int why_close(int fd) {
     if (fd > MAXFD)
         goto out;
 
-    if (task_info->file_handles[fd].device->_close) {
-        int ret = task_info->file_handles[fd].device->_close(
-            task_info->file_handles[fd].device,
-            task_info->file_handles[fd].dev_fd
+    if (task_info->psram->file_handles[fd].device->_close) {
+        int ret = task_info->psram->file_handles[fd].device->_close(
+            task_info->psram->file_handles[fd].device,
+            task_info->psram->file_handles[fd].dev_fd
         );
-        memset(&task_info->file_handles[fd], 0, sizeof(file_handle_t));
+        memset(&task_info->psram->file_handles[fd], 0, sizeof(file_handle_t));
         return ret;
     } else {
         ESP_LOGE("why_close", "fd %i has no valid close function", fd);

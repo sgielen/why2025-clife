@@ -50,6 +50,18 @@ typedef struct {
     device_t *device;
 } file_handle_t;
 
+typedef struct task_info_psram {
+    // Buffers
+    file_handle_t file_handles[MAXFD];
+    char          strerror_buf[STRERROR_BUFLEN];
+    char          asctime_buf[26];
+    char          ctime_buf[26];
+
+    // Structured
+    struct tm            gmtime_tm;
+    struct tm            localtime_tm;
+} task_info_psram_t;
+
 typedef struct task_info {
     // Pointers
     TaskHandle_t handle;
@@ -59,7 +71,6 @@ typedef struct task_info {
     char               *buffer;
     char              **argv;
     char              **argv_back;
-    char               *term;
     char               *strtok_saveptr;
     uintptr_t           heap_start;
     uintptr_t           heap_end;
@@ -79,19 +90,12 @@ typedef struct task_info {
     size_t       current_files;
     unsigned int seed;
 
-    // Buffers
-    file_handle_t file_handles[MAXFD];
-    char          strerror_buf[STRERROR_BUFLEN];
-    char          asctime_buf[26];
-    char          ctime_buf[26];
-
     // Structured
-    struct tm            gmtime_tm __attribute__((aligned(8)));
-    struct tm            localtime_tm __attribute__((aligned(8)));
-    struct malloc_state  malloc_state __attribute__((aligned(8)));
-    struct malloc_params malloc_params __attribute__((aligned(8)));
+    struct malloc_state  malloc_state;
+    struct malloc_params malloc_params;
 
-    void *pad; // Fore debugging
+    task_info_psram_t *psram;
+    void *pad; // For debugging
 } task_info_t;
 
 __attribute__((always_inline)) inline static task_info_t *get_task_info() {
