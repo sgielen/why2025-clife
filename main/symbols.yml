@@ -27,6 +27,7 @@ include:
   - wctype.h
   - complex.h
   - iconv.h
+  - compositor.h
 
 simple_function:
 # libc.a
@@ -73,6 +74,7 @@ simple_function:
 #  - clearerr
 #  - clearerr_unlocked
   - clock
+  - clock_gettime
 #  - close
 #  - creat
 #  - ctime
@@ -869,6 +871,11 @@ simple_function:
   - y1f
   - yn
   - ynf
+
+# BadgeVMS
+  - framebuffer_allocate
+  - framebuffer_free
+  - framebuffer_post
 
 simple_function_extern:
   - __divdf3

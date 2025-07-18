@@ -19,6 +19,8 @@
 #include "../device.h"
 #include "sdkconfig.h"
 
+#include "framebuffer.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,7 +38,7 @@ extern "C" {
             .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,     \
             .dpi_clock_freq_mhz = 58,                        \
             .virtual_channel = 0,                            \
-            .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,   \
+            .pixel_format = (FRAMEBUFFER_BPP == 2 ? LCD_COLOR_PIXEL_FORMAT_RGB565 : LCD_COLOR_PIXEL_FORMAT_RGB888),   \
             .num_fbs = 2                                     \
             .video_timing = {                                \
                 .h_size = 720,                               \
@@ -114,9 +116,9 @@ extern "C" {
 #define ST7703_720_720_PANEL_60HZ_DPI_CONFIG() \
     {                                                    \
         .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,     \
-        .dpi_clock_freq_mhz = 47,                        \
+        .dpi_clock_freq_mhz = 40,                        \
         .virtual_channel = 0,                            \
-        .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,   \
+        .pixel_format = (FRAMEBUFFER_BPP == 2 ? LCD_COLOR_PIXEL_FORMAT_RGB565 : LCD_COLOR_PIXEL_FORMAT_RGB888),   \
         .num_fbs = 2,                                    \
         .video_timing = {                                \
             .h_size = 720,                               \
@@ -129,6 +131,7 @@ extern "C" {
             .vsync_front_porch = 20,                     \
         },                                               \
         .flags.use_dma2d = true,                         \
+        .flags.disable_lp = false                        \
     }
 
 

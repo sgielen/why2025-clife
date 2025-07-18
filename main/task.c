@@ -286,21 +286,7 @@ static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
 
                 process_table_remove_task(task_info);
                 if (task_info->heap_size) {
-                    allocation_range_t *r = task_info->allocations;
-                    r                     = task_info->allocations;
-                    while (r) {
-                        ESP_LOGI(
-                            "HADES",
-                            "Deallocating page. vaddr_start = %p, paddr_start = %p, size = %zi",
-                            (void *)r->vaddr_start,
-                            (void *)r->paddr_start,
-                            r->size
-                        );
-                        page_deallocate(r->paddr_start);
-                        allocation_range_t *n = r->next;
-                        free(r);
-                        r = n;
-                    }
+                    pages_deallocate(task_info->allocations);
                 }
                 task_info_delete(task_info);
 

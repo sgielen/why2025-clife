@@ -26,22 +26,22 @@
 
 #define TAG "st7703"
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////// Please update the following configuration according to your LCD spec //////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#define EXAMPLE_LCD_IO_RST             (GPIO_NUM_17) // -1 if not used
-#define EXAMPLE_PIN_NUM_BK_LIGHT       (-1)          // -1 if not used
-#define EXAMPLE_LCD_BK_LIGHT_ON_LEVEL  (1)
-#define EXAMPLE_LCD_BK_LIGHT_OFF_LEVEL !EXAMPLE_LCD_BK_LIGHT_ON_LEVEL
+#define LCD_IO_RST             (GPIO_NUM_17) // -1 if not used
+#define PIN_NUM_BK_LIGHT       (-1)          // -1 if not used
+#define LCD_BK_LIGHT_ON_LEVEL  (1)
+#define LCD_BK_LIGHT_OFF_LEVEL !LCD_BK_LIGHT_ON_LEVEL
 
-#define EXAMPLE_MIPI_DSI_PHY_PWR_LDO_CHAN       (3) // LDO_VO3 is connected to VDD_MIPI_DPHY
-#define EXAMPLE_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV (2500)
-#define EXAMPLE_LCD_MIPI_DSI_LANE_NUM           (2)    // 2 data lanes
-#define EXAMPLE_LCD_MIPI_DSI_LANE_BITRATE_MBPS  (1000) // 1Gbps
+#define MIPI_DSI_PHY_PWR_LDO_CHAN       (3) // LDO_VO3 is connected to VDD_MIPI_DPHY
+#define MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV (2500)
+#define LCD_MIPI_DSI_BUS_ID             (0)
+#define LCD_MIPI_DSI_LANE_NUM           (2)    // 2 data lanes
+#define LCD_MIPI_DSI_LANE_BITRATE_MBPS  (1000) // 1Gbps
 
 #ifdef CUSTOM_INIT_CMDS
 static const st7703_lcd_init_cmd_t custom_init[] = CUSTOM_INIT_CMDS();
 #endif // CUSTOM_INIT_CMDS
+
+static void (*refresh_cb)(void *user_data);
 
 typedef struct {
     lcd_device_t device;
@@ -50,6 +50,9 @@ typedef struct {
 
 IRAM_ATTR static bool on_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx) {
     ESP_DRAM_LOGV(DRAM_STR("st7703"), "on_refresh_done");
+    if (refresh_cb) {
+        refresh_cb(user_ctx);
+    }
     return true;
 }
 
@@ -62,8 +65,8 @@ static esp_err_t enable_dsi_phy_power(void) {
     // Turn on the power for MIPI DSI PHY, so it can go from "No Power" state to "Shutdown" state
     static esp_ldo_channel_handle_t phy_pwr_chan = NULL;
     esp_ldo_channel_config_t        ldo_cfg      = {
-                    .chan_id    = EXAMPLE_MIPI_DSI_PHY_PWR_LDO_CHAN,
-                    .voltage_mv = EXAMPLE_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV,
+                    .chan_id    = MIPI_DSI_PHY_PWR_LDO_CHAN,
+                    .voltage_mv = MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV,
     };
     ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_cfg, &phy_pwr_chan));
     ESP_LOGI(TAG, "MIPI DSI PHY Powered on");
@@ -78,10 +81,10 @@ static void panel_init(st7703_device_t *device) {
     ESP_LOGI(TAG, "Create MIPI DSI bus");
     esp_lcd_dsi_bus_handle_t mipi_dsi_bus = NULL;
     esp_lcd_dsi_bus_config_t bus_config   = {
-          .bus_id             = 0,
-          .num_data_lanes     = EXAMPLE_LCD_MIPI_DSI_LANE_NUM,
-          .phy_clk_src        = MIPI_DSI_PHY_CLK_SRC_DEFAULT,
-          .lane_bit_rate_mbps = EXAMPLE_LCD_MIPI_DSI_LANE_BITRATE_MBPS,
+          .bus_id             = LCD_MIPI_DSI_BUS_ID,
+          .num_data_lanes     = LCD_MIPI_DSI_LANE_NUM,
+          .phy_clk_src        = MIPI_DSI_PHY_CLK_SRC_RC_FAST,
+          .lane_bit_rate_mbps = LCD_MIPI_DSI_LANE_BITRATE_MBPS,
     };
     ESP_ERROR_CHECK(esp_lcd_new_dsi_bus(&bus_config, &mipi_dsi_bus));
 
@@ -111,11 +114,11 @@ static void panel_init(st7703_device_t *device) {
     };
 
     esp_lcd_panel_dev_config_t lcd_dev_config = {
-        .bits_per_pixel          = 16,
+        .bits_per_pixel          = (FRAMEBUFFER_BPP * 8),
         // We are actually sending RGB data to the display. For soms reason on the WHY2025 badge
         // this is backwards
         .rgb_ele_order           = LCD_RGB_ELEMENT_ORDER_BGR,
-        .reset_gpio_num          = EXAMPLE_LCD_IO_RST,
+        .reset_gpio_num          = LCD_IO_RST,
         .vendor_config           = &vendor_config,
         .flags.reset_active_high = 1,
     };
@@ -127,18 +130,18 @@ static void panel_init(st7703_device_t *device) {
 
     esp_lcd_dpi_panel_event_callbacks_t cbs = {
         .on_refresh_done = on_refresh_done,
-        .on_color_trans_done = on_color_trans_done,
+        // .on_color_trans_done = on_color_trans_done,
     };
     esp_lcd_dpi_panel_register_event_callbacks(device->disp_panel, &cbs, NULL);
 
-#if EXAMPLE_PIN_NUM_BK_LIGHT >= 0
+#if PIN_NUM_BK_LIGHT >= 0
     ESP_LOGI(TAG, "Turn on LCD backlight");
-    gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, EXAMPLE_LCD_BK_LIGHT_ON_LEVEL);
+    gpio_set_level(PIN_NUM_BK_LIGHT, LCD_BK_LIGHT_ON_LEVEL);
 #endif
 
-#if CONFIG_EXAMPLE_LCD_TOUCH_CONTROLLER_GT911
+#if CONFIG_LCD_TOUCH_CONTROLLER_GT911
     esp_lcd_touch_handle_t tp_handle = create_tp_handle();
-#endif // CONFIG_EXAMPLE_LCD_TOUCH_CONTROLLER_GT911
+#endif // CONFIG_LCD_TOUCH_CONTROLLER_GT911
 }
 
 void draw(void *dev, int x, int y, int w, int h, void *pixels) {
@@ -146,14 +149,32 @@ void draw(void *dev, int x, int y, int w, int h, void *pixels) {
     esp_lcd_panel_draw_bitmap(device->disp_panel, x, y, w, h, pixels);
 }
 
-void get_framebuffer(void *dev, void **pixels) {
+void get_framebuffer(void *dev, int num, void **pixels) {
+    void *fb0;
+    void *fb1;
     st7703_device_t *device = dev;
-    esp_lcd_dpi_panel_get_frame_buffer(device->disp_panel, 1, pixels);
+    num += 1;
+    num = num > 2 ? 2 : num;
+    esp_lcd_dpi_panel_get_frame_buffer(device->disp_panel, num, &fb0, &fb1);
+
+    if (num == 1) *pixels = fb0;
+    if (num == 2) *pixels = fb1;
+}
+
+void set_refresh_cb(void *dev, void *user_data, void (*callback)(void *user_data)) {
+    st7703_device_t *device = dev;
+
+    esp_lcd_dpi_panel_event_callbacks_t cbs = {
+        .on_refresh_done = on_refresh_done,
+        .on_color_trans_done = NULL,
+    };
+
+    esp_lcd_dpi_panel_register_event_callbacks(device->disp_panel, &cbs, user_data);
 }
 
 device_t *st7703_create() {
     ESP_LOGI(TAG, "Initializing");
-    st7703_device_t *dev  = malloc(sizeof(st7703_device_t));
+    st7703_device_t *dev  = calloc(1, sizeof(st7703_device_t));
     device_t *base_dev = (device_t*)dev;
     lcd_device_t *lcd_dev = (lcd_device_t*)dev;
 

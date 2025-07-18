@@ -15,10 +15,11 @@
  */
 
 
+#include "compositor.h"
 #include "device.h"
 #include "drivers/fatfs.h"
-#include "drivers/tty.h"
 #include "drivers/st7703.h"
+#include "drivers/tty.h"
 #include "elf_symbols.h"
 #include "esp_debug_helpers.h"
 #include "esp_log.h"
@@ -35,13 +36,12 @@
 #include "hal/mmu_types.h"
 #include "logical_names.h"
 #include "memory.h"
+#include "png.h"
 #include "task.h"
 
-#include "png.h"
-
+#include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
 
 extern void        spi_flash_enable_interrupts_caches_and_other_cpu(void);
 extern void        spi_flash_disable_interrupts_caches_and_other_cpu(void);
@@ -58,18 +58,21 @@ extern uint8_t const test_elf_c_start[] asm("_binary_test_basic_c_elf_start");
 extern uint8_t const test_elf_c_end[] asm("_binary_test_basic_c_elf_end");
 extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
-#endif
 extern uint8_t const test_elf_bench_a_start[] asm("_binary_bench_basic_a_elf_start");
 extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end");
 extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
 extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end");
+#endif
 
-extern FILE * why_fopen(const char *pathname, const char *mode);
-extern int why_fseek(FILE *stream, long offset, int whence);
-extern void why_rewind(FILE *stream);
+extern uint8_t const framebuffer_test_a_start[] asm("_binary_framebuffer_test_a_elf_start");
+extern uint8_t const framebuffer_test_a_end[] asm("_binary_framebuffer_test_a_elf_end");
+
+extern FILE  *why_fopen(char const *pathname, char const *mode);
+extern int    why_fseek(FILE *stream, long offset, int whence);
+extern void   why_rewind(FILE *stream);
 extern size_t why_fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
-extern int why_fclose(FILE *f);
-extern long why_ftell(FILE *stream);
+extern int    why_fclose(FILE *f);
+extern long   why_ftell(FILE *stream);
 
 void IRAM_ATTR __wrap_esp_panic_handler(panic_info_t *info) {
     task_info_t *task_info = get_task_info();
@@ -84,6 +87,8 @@ void IRAM_ATTR __wrap_esp_panic_handler(panic_info_t *info) {
 
 int app_main(void) {
     printf("BadgeVMS Initializing...\n");
+    size_t free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    ESP_LOGW(TAG, "Free main memory: %zi", free_ram);
 
     memory_init();
     task_init();
@@ -95,24 +100,38 @@ int app_main(void) {
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
     logical_name_set("SEARCH", "FLASH0:[SUBDIR], FLASH0:[SUBDIR.ANOTHER]", false);
 
+    compositor_init("PANEL0");
+
     printf("BadgeVMS is ready\n");
+    free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    ESP_LOGW(TAG, "Free main memory: %zi", free_ram);
 
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a);
     //
-    png_image image;
-    memset(&image, 0, (sizeof image));
-    image.version = PNG_IMAGE_VERSION;
+    //    png_image image;
+    //    memset(&image, 0, (sizeof image));
+    //   image.version = PNG_IMAGE_VERSION;
 
-    int buf_size = 720 * 720 * 3;
+#if 0
+    int           buf_size   = 720 * 720 * 2;
     // png_bytep pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
-    lcd_device_t *lcd_device = (lcd_device_t*)device_get("PANEL0");
-    void *pixels;
-    lcd_device->_getfb(lcd_device, &pixels);
-    memset(pixels, 0, buf_size);
-    for (int i = 0; i < buf_size; i += 3) {
-        ((char*)pixels)[i] = 0xff;
+    lcd_device_t *lcd_device = (lcd_device_t *)device_get("PANEL0");
+    if (lcd_device) {
+        void *pixels;
+        lcd_device->_getfb(lcd_device, &pixels);
+        memset(pixels, 0, buf_size);
+        for (int i = 0; i < buf_size / 2; ++i) {
+            if (i < 720 * (720 / 3)) 
+                ((uint16_t *)pixels)[i] = 0x1F;
+            else if (i < 720 * ((720 / 3) * 2))
+                ((uint16_t *)pixels)[i] = 0x7E0;
+            else 
+                ((uint16_t *)pixels)[i] = 0xF800;
+
+        }
+        lcd_device->_draw(lcd_device, 0, 0, 720, 720, pixels);
     }
-    lcd_device->_draw(lcd_device, 0, 0, 720, 720, pixels);
+#endif
 
 #if 0
     FILE *f = why_fopen("FLASH0:BADGEVMS.PNG", "r");
@@ -159,16 +178,27 @@ int app_main(void) {
     argv[0]     = strdup("test_elf_c");
     argv[1]     = strdup("argv[xxx]");
 
+    pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    ESP_LOGI(TAG, "Started task with pid %i", pidb);
+
     while (1) {
-        for (int i = 1; i < 3; ++i) {
+        fprintf(stderr, ".");
+        fflush(stderr);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    };
+
+    while (1) {
+        for (int i = 1; i < 2; ++i) {
             sprintf(argv[1], "argv[%d]", 0);
             // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pida);
-            pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+            pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             ESP_LOGI(TAG, "Started task with pid %i", pidb);
-            vTaskDelay(500 / portTICK_PERIOD_MS);
+            // vTaskDelay(500 / portTICK_PERIOD_MS);
         }
-        vTaskDelay(60000 / portTICK_PERIOD_MS);
+        size_t free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        ESP_LOGW(TAG, "Free main memory: %zi", free_ram);
+        // vTaskDelay(6000 / portTICK_PERIOD_MS);
     }
     // pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);

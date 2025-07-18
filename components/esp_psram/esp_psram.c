@@ -447,27 +447,9 @@ esp_err_t esp_psram_extram_add_to_heap_allocator(void)
 
 bool IRAM_ATTR esp_psram_check_ptr_addr(const void *p)
 {
-    if (!s_psram_ctx.is_initialised) {
-        return false;
-    }
-
-    if (((intptr_t)p >= s_psram_ctx.mapped_regions[PSRAM_MEM_8BIT_ALIGNED].vaddr_start && (intptr_t)p < s_psram_ctx.mapped_regions[PSRAM_MEM_8BIT_ALIGNED].vaddr_end) ||
-            ((intptr_t)p >= s_psram_ctx.mapped_regions[PSRAM_MEM_32BIT_ALIGNED].vaddr_start && (intptr_t)p < s_psram_ctx.mapped_regions[PSRAM_MEM_32BIT_ALIGNED].vaddr_end)) {
+    if ((uintptr_t)p >= SOC_EXTRAM_LOW && (uintptr_t)p < SOC_EXTRAM_HIGH) {
         return true;
     }
-
-#if CONFIG_SPIRAM_RODATA && !CONFIG_IDF_TARGET_ESP32S2
-    if (mmu_psram_check_ptr_addr_in_rodata_alignment_gap(p)) {
-        return true;
-    }
-#endif /* CONFIG_SPIRAM_RODATA && !CONFIG_IDF_TARGET_ESP32S2 */
-
-#if CONFIG_SPIRAM_FETCH_INSTRUCTIONS && SOC_MMU_DI_VADDR_SHARED
-    if (mmu_psram_check_ptr_addr_in_instruction_alignment_gap(p)) {
-        return true;
-    }
-#endif /* CONFIG_SPIRAM_FETCH_INSTRUCTIONS && SOC_MMU_DI_VADDR_SHARED */
-
     return false;
 }
 

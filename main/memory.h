@@ -27,7 +27,7 @@
  * ...                      Page allocator metadata
  * SOC_EXTRAM_LOW + 1 page
  * ...                      Kernel SPIRAM heap
- * SOC_EXTRAM_LOW + 10MB
+ * SOC_EXTRAM_LOW + 5MB
  * ...                      Framebuffers
  * SOC_EXTRAM_LOW + 20MB
  * ...                      Unused
@@ -42,11 +42,11 @@
 #define VADDR_START       SOC_EXTRAM_LOW
 #define VADDR_TASK_START  ((SOC_EXTRAM_LOW + PHYSMEM_AMOUNT) & ~(SOC_MMU_PAGE_SIZE - 1))
 // Allocate 10MB of VADDR space for the kernel
-#define KERNEL_HEAP_SIZE  (((1024 * 1024) * 10) - SOC_MMU_PAGE_SIZE)
+#define KERNEL_HEAP_SIZE  (((1024 * 1024) * 5) - SOC_MMU_PAGE_SIZE)
 #define KERNEL_HEAP_START SOC_EXTRAM_LOW + SOC_MMU_PAGE_SIZE
 
 // Allocate 10MB of VADDR space for framebuffers
-#define FRAMEBUFFER_HEAP_SIZE  (1024 * 1024 * 10)
+#define FRAMEBUFFER_HEAP_SIZE  (1024 * 1024 * 15)
 #define FRAMEBUFFER_HEAP_START ((SOC_EXTRAM_LOW + FRAMEBUFFER_HEAP_SIZE) & ~(SOC_MMU_PAGE_SIZE - 1))
 #define FRAMEBUFFERS_START     FRAMEBUFFFER_HEAP_START + SOC_MMU_PAGE_SIZE
 
@@ -69,5 +69,14 @@ typedef struct task_info task_info_t;
 void     *why_sbrk(intptr_t increment);
 void      page_deallocate(uintptr_t paddr_start);
 uintptr_t page_allocate(size_t size);
+
+bool pages_allocate(
+    uintptr_t vaddr_start, uintptr_t pages, allocation_range_t **head_range, allocation_range_t **tail_range
+);
+void pages_deallocate(allocation_range_t *head_range);
+
+uintptr_t framebuffer_vaddr_allocate(size_t size, size_t *out_pages);
+void      framebuffer_vaddr_deallocate(uintptr_t start_address);
+void      framebuffer_map_pages(allocation_range_t *head_range, allocation_range_t *tail_range);
 
 void memory_init();

@@ -2,6 +2,7 @@ idf_component_register(
     SRCS
 	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
 	 "buddy_alloc.c"
+	 "compositor.c"
 	 "device.c"
 	 "drivers/fatfs.c"
 	 "drivers/st7703.c"
@@ -18,18 +19,20 @@ idf_component_register(
 	 ${CMAKE_CURRENT_SOURCE_DIR}/
 	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     EMBED_FILES
+    	"${CMAKE_BINARY_DIR}/test_elfs/framebuffer_test_a.elf"
 #    	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_a.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_a.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
      PRIV_REQUIRES
-        "esp_mm"
-	"esp_psram"
-	"vfs"
-	"fatfs"
+	"esp_driver_ppa"
 	"esp_lcd_st7703"
+	"esp_psram"
+	"fatfs"
+	"vfs"
+        "esp_mm"
 )
 
 add_custom_command(

@@ -12,9 +12,13 @@
   - Add trace hooks for traceTASK_SWITCHED_IN and traceTASK_SWITCHED_OUT
     - BadgeVMS uses these tracepoints to swap in and out the MMU mappings for each task
 
+* esp_lcd (From esp-idf 5.4.2)
+  - Use BadgeVMS framebuffer allocator instead of heap_caps_*
+
 * esp_psram (From esp-idf 5.4.2)
   - Disable default MMU mapping
     - BadgeVMS manages all PSRam MMU mappings
+  - esp_psram_check_ptr_addr only checks for vaddr range, not actual mapping
 
 * why_stdio (From picolibc)
   - Rename stdio functions with a why_ prefix

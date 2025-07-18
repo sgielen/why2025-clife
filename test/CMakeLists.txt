@@ -32,6 +32,7 @@ function(build_test_elf name source)
 	    -e main
 	    -include fix_stdio.h
 	    -I${CMAKE_CURRENT_SOURCE_DIR}
+	    -I${CMAKE_CURRENT_SOURCE_DIR}/../main
             -o ${TEST_ELF_DIR}/${name}.elf
             ${CMAKE_CURRENT_SOURCE_DIR}/${source}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
@@ -42,9 +43,10 @@ function(build_test_elf name source)
     add_custom_target(${name}_elf ALL DEPENDS ${TEST_ELF_DIR}/${name}.elf)
 endfunction()
 
-build_test_elf(test_basic_a test_basic_a.c)
-build_test_elf(test_basic_b test_basic_b.c)
-build_test_elf(test_basic_c test_basic_c.c)
-build_test_elf(test_shell shell.c)
+#build_test_elf(test_basic_a test_basic_a.c)
+#build_test_elf(test_basic_b test_basic_b.c)
+#build_test_elf(test_basic_c test_basic_c.c)
+#build_test_elf(test_shell shell.c)
 build_test_elf(bench_basic_a bench_basic_a.c)
 build_test_elf(bench_basic_b bench_basic_b.c)
+build_test_elf(framebuffer_test_a framebuffer_test_a.c)

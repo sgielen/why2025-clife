@@ -202,7 +202,24 @@ void IRAM_ATTR unmap_task(task_info_t *task_info) {
     }
 }
 
-__attribute__((always_inline)) static inline bool allocate_pages(
+IRAM_ATTR void pages_deallocate(allocation_range_t *head_range) {
+    allocation_range_t *r = head_range;
+    while (r) {
+        ESP_LOGI(
+            TAG,
+            "Deallocating page. vaddr_start = %p, paddr_start = %p, size = %zi",
+            (void *)r->vaddr_start,
+            (void *)r->paddr_start,
+            r->size
+        );
+        page_deallocate(r->paddr_start);
+        allocation_range_t *n = r->next;
+        free(r);
+        r = n;
+    }
+}
+
+IRAM_ATTR bool pages_allocate(
     uintptr_t vaddr_start, uintptr_t pages, allocation_range_t **head_range, allocation_range_t **tail_range
 ) {
     if (pages > buddy_get_free_pages(&page_allocator)) {
@@ -274,6 +291,28 @@ __attribute__((always_inline)) static inline bool allocate_pages(
     return true;
 }
 
+uintptr_t IRAM_ATTR framebuffer_vaddr_allocate(size_t size, size_t *out_pages) {
+    size_t aligned_size = ((size + (SOC_MMU_PAGE_SIZE - 1)) & ~(SOC_MMU_PAGE_SIZE - 1));
+    void  *ret          = buddy_allocate(&framebuffer_allocator, aligned_size, 0, 0);
+    if (ret) {
+        *out_pages = aligned_size / SOC_MMU_PAGE_SIZE;
+        return (uintptr_t)ret;
+    }
+
+    *out_pages = 0;
+    return 0;
+}
+
+void IRAM_ATTR framebuffer_vaddr_deallocate(uintptr_t start_address) {
+    if (start_address) {
+        buddy_deallocate(&framebuffer_allocator, (void *)start_address);
+    }
+}
+
+void IRAM_ATTR framebuffer_map_pages(allocation_range_t *head_range, allocation_range_t *tail_range) {
+    map_regions(head_range, tail_range);
+}
+
 void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
     task_info_t *task_info = get_task_info();
     uintptr_t    old       = task_info->heap_end;
@@ -298,7 +337,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
         // Ranges are in reverse order, when we insert our new ranges into
         // the task_info this range needs to be tied to the old head
 
-        if (!allocate_pages(vaddr_start, pages, &head_range, &tail_range)) {
+        if (!pages_allocate(vaddr_start, pages, &head_range, &tail_range)) {
             goto error;
         }
 
@@ -396,6 +435,19 @@ error:
     return (void *)-1;
 }
 
+void page_deallocate(uintptr_t paddr_start) {
+    buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(paddr_start));
+}
+
+uintptr_t page_allocate(size_t size) {
+    void *ret = buddy_allocate(&page_allocator, size, 0, 0);
+    if (ret) {
+        return ADDR_TO_PADDR((uintptr_t)ret);
+    }
+    // This is fine because page 0 is always used by the allocator itself
+    return 0;
+}
+
 // Cribbed from ESP-IDF 5.4.2
 static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
     int volatile *spiram = (int volatile *)v_start;
@@ -426,19 +478,6 @@ static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
         ESP_DRAM_LOGI(DRAM_STR("memory_test"), "SPI SRAM memory test OK");
         return true;
     }
-}
-
-void page_deallocate(uintptr_t paddr_start) {
-    buddy_deallocate(&page_allocator, (void *)PADDR_TO_ADDR(paddr_start));
-}
-
-uintptr_t page_allocate(size_t size) {
-    void *ret = buddy_allocate(&page_allocator, size, 0, 0);
-    if (ret) {
-        return ADDR_TO_PADDR((uintptr_t)ret);
-    }
-    // This is fine because page 0 is always used by the allocator itself
-    return 0;
 }
 
 void IRAM_ATTR memory_init() {

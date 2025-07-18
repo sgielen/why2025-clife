@@ -47,7 +47,8 @@ typedef struct {
 typedef struct lcd_device_s {
     device_t device;
     void (*_draw)(void *dev, int x, int y, int w, int h, void *pixels);
-    void (*_getfb)(void *dev, void **pixels);
+    void (*_getfb)(void *dev, int num, void **pixels);
+    void (*_set_refresh_cb)(void *dev, void *user_data, void (*callback)(void *user_data));
 } lcd_device_t;
 
 void      device_init();
