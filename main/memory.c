@@ -62,6 +62,19 @@ extern void spi_flash_disable_cache(uint32_t cpuid, uint32_t saved_state);
 extern void        init_memory_heap_caps();
 static char const *TAG = "memory";
 
+IRAM_ATTR void dump_mmu() {
+    uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
+
+    esp_rom_printf("\n*********** MMU DUMP START ***********\n");
+    for (int i = 0; i < SOC_MMU_ENTRY_NUM; i++) {
+        uint32_t entry = mmu_ll_read_entry(mmu_id, i);
+        if (entry) {
+            esp_rom_printf("entry: %03lu: vaddr 0x%08lx -> paddr 0x%08lx\n", i, SOC_EXTRAM_LOW + (i * SOC_MMU_PAGE_SIZE), (entry & ~0xC00) << 16);
+        }
+    }
+    esp_rom_printf("*********** MMU DUMP END   ***********\n");
+}
+
 // Copied from ESP-IDF 5.4.2 for speed
 __attribute__((always_inline)) static inline bool
     why_mmu_ll_check_valid_paddr_region(uint32_t mmu_id, uint32_t paddr_start, uint32_t len) {
@@ -603,4 +616,5 @@ void IRAM_ATTR memory_init() {
     cache_lock = xSemaphoreCreateMutex();
     init_memory_heap_caps();
     print_allocator(&page_allocator);
+    dump_mmu();
 }

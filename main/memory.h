@@ -80,3 +80,4 @@ void      framebuffer_vaddr_deallocate(uintptr_t start_address);
 void      framebuffer_map_pages(allocation_range_t *head_range, allocation_range_t *tail_range);
 
 void memory_init();
+void dump_mmu();
