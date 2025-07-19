@@ -30,6 +30,10 @@ menu "PSRAM config"
         help
             Select the speed for the PSRAM chip.
 
+        config SPIRAM_SPEED_100M
+            depends on IDF_EXPERIMENTAL_FEATURES
+            bool "100MHz clock speed"
+
         config SPIRAM_SPEED_200M
             depends on IDF_EXPERIMENTAL_FEATURES
             bool "200MHz clock speed"
