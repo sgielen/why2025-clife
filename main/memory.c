@@ -40,7 +40,7 @@
 
 static allocator_t       page_allocator;
 static allocator_t       framebuffer_allocator;
-static SemaphoreHandle_t cache_lock = NULL;
+static portMUX_TYPE      mmu_cache_lock = portMUX_INITIALIZER_UNLOCKED;
 
 typedef struct {
     uint32_t         start;   // laddr start
@@ -120,6 +120,7 @@ __attribute__((always_inline)) static inline void
 
     mmu_val = mmu_ll_format_paddr(mmu_id, paddr, mem_type);
 
+    vPortEnterCriticalSafe(&mmu_cache_lock);
     while (page_num) {
         entry_id = mmu_ll_get_entry_id(mmu_id, vaddr);
         mmu_ll_write_entry(mmu_id, entry_id, mmu_val, mem_type);
@@ -127,37 +128,38 @@ __attribute__((always_inline)) static inline void
         mmu_val++;
         page_num--;
     }
+    vPortExitCriticalSafe(&mmu_cache_lock);
 }
 
 __attribute__((always_inline)) static inline void invalidate_caches(uintptr_t vaddr_start, uint32_t len) {
+    vPortEnterCriticalSafe(&mmu_cache_lock);
     cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
     cache_ll_l1_invalidate_dcache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
     cache_ll_l2_invalidate_cache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    vPortExitCriticalSafe(&mmu_cache_lock);
 }
 
 __attribute__((always_inline)) static inline void writeback_caches(uintptr_t vaddr_start, uint32_t len) {
+    vPortEnterCriticalSafe(&mmu_cache_lock);
     // cache_ll_writeback_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL);
     cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
+    vPortExitCriticalSafe(&mmu_cache_lock);
 }
 
 IRAM_ATTR esp_err_t __wrap_esp_cache_msync(void *addr, size_t size, int flags) {
-    spi_flash_disable_interrupts_caches_and_other_cpu();
     if (flags & ESP_CACHE_MSYNC_FLAG_DIR_C2M) {
         writeback_caches((uintptr_t)addr, size);
-        spi_flash_enable_interrupts_caches_and_other_cpu();
         return 0;
     }
 
     if (flags & ESP_CACHE_MSYNC_FLAG_DIR_M2C) {
         invalidate_caches((uintptr_t)addr, size);
-        spi_flash_enable_interrupts_caches_and_other_cpu();
         return 0;
     }
 
     writeback_caches((uintptr_t)addr, size);
     invalidate_caches((uintptr_t)addr, size);
 
-    spi_flash_enable_interrupts_caches_and_other_cpu();
     return 0;
 }
 
@@ -169,12 +171,15 @@ __attribute__((always_inline)) static inline void
 
     uint32_t page_num = (len + page_size_in_bytes - 1) / page_size_in_bytes;
     uint32_t entry_id = 0;
+
+    vPortEnterCriticalSafe(&mmu_cache_lock);
     while (page_num) {
         entry_id = mmu_ll_get_entry_id(mmu_id, vaddr);
         mmu_ll_set_entry_invalid(mmu_id, entry_id);
         vaddr += page_size_in_bytes;
         page_num--;
     }
+    vPortExitCriticalSafe(&mmu_cache_lock);
 }
 
 __attribute__((always_inline)) static inline void
@@ -196,18 +201,14 @@ __attribute__((always_inline)) static inline void
             r->size,
             r->next
         );
-        spi_flash_disable_interrupts_caches_and_other_cpu();
         why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
         // Give other tasks a chance
-        spi_flash_enable_interrupts_caches_and_other_cpu();
         total_size += r->size;
         r           = r->next;
     }
 
     // Invalidate all caches at once
-    spi_flash_disable_interrupts_caches_and_other_cpu();
     invalidate_caches(start, total_size);
-    spi_flash_enable_interrupts_caches_and_other_cpu();
 }
 
 void IRAM_ATTR remap_task(task_info_t *task_info) {
@@ -412,9 +413,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     (void *)r->paddr_start,
                     r->size
                 );
-                spi_flash_disable_interrupts_caches_and_other_cpu();
                 why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
-                spi_flash_enable_interrupts_caches_and_other_cpu();
 
                 page_deallocate(r->paddr_start);
 
@@ -434,7 +433,6 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     to_decrement
                 );
 
-                spi_flash_disable_interrupts_caches_and_other_cpu();
                 // Make sure that all existing ram is written
                 writeback_caches(r->vaddr_start, r->size - to_decrement);
                 // Unmap the whole region
@@ -443,7 +441,6 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                 r->size -= to_decrement;
                 why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
                 invalidate_caches(r->vaddr_start, r->size);
-                spi_flash_enable_interrupts_caches_and_other_cpu();
 
                 page_deallocate(r->paddr_start + to_decrement);
                 to_decrement = 0;
@@ -613,7 +610,6 @@ void IRAM_ATTR memory_init() {
         0
     );
 
-    cache_lock = xSemaphoreCreateMutex();
     init_memory_heap_caps();
     print_allocator(&page_allocator);
     dump_mmu();
