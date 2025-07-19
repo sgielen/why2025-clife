@@ -19,9 +19,9 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
         // Allocate some memory
         char* ptr = malloc(ALLOC_SIZE);
-        if (task_id == 2) {
-            *((char*)((void*)0x4c100000)) = '0';
-        }
+        // if (task_id == 2) {
+        //     *((char*)((void*)0x4c100000)) = '0';
+        //}
         if (ptr) {
             memset(ptr, task_id, ALLOC_SIZE);
             ptrs[i % 100] = ptr;
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
                         t = ptrs[(i - 50) % 100][k];
 
                         if (t != task_id) {
-                            printf("Error unexpected memory contents! expected 0x%X got 0x%X (%c) in ptr number %i\n", task_id, t, t, (i - 50) % 100);
+                            printf("\033[0;31mError unexpected memory contents! expected 0x%X got 0x%X (%c) in ptr number %i\033[0m\n", task_id, t, t, (i - 50) % 100);
                             return 1;
                         }
                         ptrs[(i - 50) % 100][k] = '$';
