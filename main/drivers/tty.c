@@ -73,8 +73,8 @@ static ssize_t tty_lseek(void *dev, int fd, off_t offset, int whence) {
 }
 
 device_t *tty_create(bool is_stdout, bool is_stdin) {
-    tty_device_t *dev  = malloc(sizeof(tty_device_t));
-    device_t *base_dev = (device_t*)dev;
+    tty_device_t *dev      = malloc(sizeof(tty_device_t));
+    device_t     *base_dev = (device_t *)dev;
 
     base_dev->type   = DEVICE_TYPE_BLOCK;
     base_dev->_open  = tty_open;
@@ -83,8 +83,8 @@ device_t *tty_create(bool is_stdout, bool is_stdin) {
     base_dev->_read  = tty_read;
     base_dev->_lseek = tty_lseek;
 
-    dev->is_stdout     = is_stdout;
-    dev->is_stdin      = is_stdin;
+    dev->is_stdout = is_stdout;
+    dev->is_stdin  = is_stdin;
 
     return (device_t *)dev;
 }

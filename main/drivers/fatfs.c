@@ -69,7 +69,7 @@ device_t *fatfs_create_spi(char const *devname, char const *partname, bool rw) {
     strcpy(dev->base_path + 1, devname);
 
     esp_err_t err      = esp_vfs_fat_spiflash_mount_rw_wl(dev->base_path, partname, &mount_config, &dev->wl_handle);
-    device_t *base_dev = (device_t*)dev;
+    device_t *base_dev = (device_t *)dev;
 
     base_dev->type   = DEVICE_TYPE_BLOCK;
     base_dev->_open  = fatfs_open;

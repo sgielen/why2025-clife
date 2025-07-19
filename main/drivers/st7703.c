@@ -17,12 +17,12 @@
 #include "st7703.h"
 
 #include "driver/gpio.h"
-#include "esp_log.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_st7703.h"
 #include "esp_ldo_regulator.h"
+#include "esp_log.h"
 
 #define TAG "st7703"
 
@@ -38,17 +38,18 @@
 #define LCD_MIPI_DSI_LANE_BITRATE_MBPS  (1000) // 1Gbps
 
 #ifdef CUSTOM_INIT_CMDS
-static const st7703_lcd_init_cmd_t custom_init[] = CUSTOM_INIT_CMDS();
+static st7703_lcd_init_cmd_t const custom_init[] = CUSTOM_INIT_CMDS();
 #endif // CUSTOM_INIT_CMDS
 
 static void (*refresh_cb)(void *user_data);
 
 typedef struct {
-    lcd_device_t device;
+    lcd_device_t           device;
     esp_lcd_panel_handle_t disp_panel;
 } st7703_device_t;
 
-IRAM_ATTR static bool on_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx) {
+IRAM_ATTR static bool
+    on_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx) {
     ESP_DRAM_LOGV(DRAM_STR("st7703"), "on_refresh_done");
     if (refresh_cb) {
         refresh_cb(user_ctx);
@@ -56,7 +57,8 @@ IRAM_ATTR static bool on_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_
     return true;
 }
 
-IRAM_ATTR static bool on_color_trans_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx) {
+IRAM_ATTR static bool
+    on_color_trans_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx) {
     ESP_DRAM_LOGV(DRAM_STR("st7703"), "on_color_trans_done");
     return true;
 }
@@ -150,22 +152,24 @@ void draw(void *dev, int x, int y, int w, int h, void *pixels) {
 }
 
 void get_framebuffer(void *dev, int num, void **pixels) {
-    void *fb0;
-    void *fb1;
-    st7703_device_t *device = dev;
-    num += 1;
-    num = num > 2 ? 2 : num;
+    void            *fb0;
+    void            *fb1;
+    st7703_device_t *device  = dev;
+    num                     += 1;
+    num                      = num > 2 ? 2 : num;
     esp_lcd_dpi_panel_get_frame_buffer(device->disp_panel, num, &fb0, &fb1);
 
-    if (num == 1) *pixels = fb0;
-    if (num == 2) *pixels = fb1;
+    if (num == 1)
+        *pixels = fb0;
+    if (num == 2)
+        *pixels = fb1;
 }
 
 void set_refresh_cb(void *dev, void *user_data, void (*callback)(void *user_data)) {
     st7703_device_t *device = dev;
 
     esp_lcd_dpi_panel_event_callbacks_t cbs = {
-        .on_refresh_done = on_refresh_done,
+        .on_refresh_done     = on_refresh_done,
         .on_color_trans_done = NULL,
     };
 
@@ -174,11 +178,11 @@ void set_refresh_cb(void *dev, void *user_data, void (*callback)(void *user_data
 
 device_t *st7703_create() {
     ESP_LOGI(TAG, "Initializing");
-    st7703_device_t *dev  = calloc(1, sizeof(st7703_device_t));
-    device_t *base_dev = (device_t*)dev;
-    lcd_device_t *lcd_dev = (lcd_device_t*)dev;
+    st7703_device_t *dev      = calloc(1, sizeof(st7703_device_t));
+    device_t        *base_dev = (device_t *)dev;
+    lcd_device_t    *lcd_dev  = (lcd_device_t *)dev;
 
-    lcd_dev->_draw = draw;
+    lcd_dev->_draw  = draw;
     lcd_dev->_getfb = get_framebuffer;
 
     base_dev->type   = DEVICE_TYPE_LCD;
