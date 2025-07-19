@@ -59,6 +59,8 @@ extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 extern void spi_flash_restore_cache(uint32_t cpuid, uint32_t saved_state);
 extern void spi_flash_disable_cache(uint32_t cpuid, uint32_t saved_state);
 
+extern esp_err_t __real_esp_cache_msync(void *addr, size_t size, int flags);
+
 extern void        init_memory_heap_caps();
 static char const *TAG = "memory";
 
@@ -130,35 +132,23 @@ __attribute__((always_inline)) static inline void
 }
 
 __attribute__((always_inline)) static inline void invalidate_caches(uintptr_t vaddr_start, uint32_t len) {
-    cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
-    cache_ll_l1_invalidate_dcache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
-    cache_ll_l2_invalidate_cache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    // cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    // cache_ll_l1_invalidate_dcache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    // cache_ll_l2_invalidate_cache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    cache_hal_invalidate_addr(vaddr_start, len);
 }
 
 __attribute__((always_inline)) static inline void writeback_caches(uintptr_t vaddr_start, uint32_t len) {
     // cache_ll_writeback_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL);
-    cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
+    // cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
+    cache_hal_writeback_addr(vaddr_start, len);
 }
 
 IRAM_ATTR esp_err_t __wrap_esp_cache_msync(void *addr, size_t size, int flags) {
     vPortEnterCriticalSafe(&mmu_cache_lock);
-    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_C2M) {
-        writeback_caches((uintptr_t)addr, size);
-        vPortExitCriticalSafe(&mmu_cache_lock);
-        return 0;
-    }
-
-    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_M2C) {
-        invalidate_caches((uintptr_t)addr, size);
-        vPortExitCriticalSafe(&mmu_cache_lock);
-        return 0;
-    }
-
-    writeback_caches((uintptr_t)addr, size);
-    invalidate_caches((uintptr_t)addr, size);
+    esp_err_t r = __real_esp_cache_msync(addr, size, flags);
     vPortExitCriticalSafe(&mmu_cache_lock);
-
-    return 0;
+    return r;
 }
 
 __attribute__((always_inline)) static inline void
