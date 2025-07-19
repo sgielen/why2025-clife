@@ -878,6 +878,7 @@ simple_function:
   - framebuffer_post
 
 simple_function_extern:
+  - __adddf3
   - __divdf3
   - __fixdfsi
   - __fixunsdfsi
@@ -885,6 +886,7 @@ simple_function_extern:
   - __floatunsidf
   - __gtdf2
   - __ltdf2
+  - __muldf3
 
 simple_object:
 

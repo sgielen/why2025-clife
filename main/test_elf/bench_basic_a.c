@@ -1,10 +1,11 @@
-#include <unistd.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+
 #include <sys/time.h>
+#include <unistd.h>
 
 #define NUM_SWITCHES 100000
-volatile int counter = 0;
+int volatile counter = 0;
 
 int main(int argc, char *argv[]) {
     struct timeval start, end;
@@ -23,8 +24,7 @@ int main(int argc, char *argv[]) {
 
     gettimeofday(&end, NULL);
 
-    long microseconds = (end.tv_sec - start.tv_sec) * 1000000 +
-                       (end.tv_usec - start.tv_usec);
+    long microseconds = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 
     printf("Context Switch Benchmark Results:\n");
     printf("Total switches: %d\n", NUM_SWITCHES);

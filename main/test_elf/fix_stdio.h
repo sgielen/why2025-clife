@@ -9,7 +9,6 @@ extern FILE *const stderr;
 
 /* The stdin, stdout, and stderr symbols are described as macros in the C
  * standard. */
-#define stdin stdin
+#define stdin  stdin
 #define stdout stdout
 #define stderr stderr
-

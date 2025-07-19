@@ -58,9 +58,9 @@ extern uint8_t const test_elf_c_start[] asm("_binary_test_basic_c_elf_start");
 extern uint8_t const test_elf_c_end[] asm("_binary_test_basic_c_elf_end");
 extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
+#endif
 extern uint8_t const test_elf_bench_a_start[] asm("_binary_bench_basic_a_elf_start");
 extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end");
-#endif
 extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
 extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end");
 
@@ -181,6 +181,8 @@ int app_main(void) {
 
     pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     ESP_LOGI(TAG, "Started task with pid %i", pidb);
+    pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
 #if 0
     while (1) {
@@ -191,30 +193,32 @@ int app_main(void) {
 #endif
 
     while (1) {
-        for (int i = 1; i < 3; ++i) {
+        while (get_num_tasks() < 10) {
             sprintf(argv[1], "argv[%d]", 0);
-            // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+            pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pida);
             pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-            ESP_LOGI(TAG, "Started task with pid %i", pidb);
+            // ESP_LOGI(TAG, "Started task with pid %i", pidb);
             // vTaskDelay(500 / portTICK_PERIOD_MS);
         }
-        size_t free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
         ESP_LOGW(TAG, "Free main memory: %zi", free_ram);
-        vTaskDelay(6000 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     // pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a);
     //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b);
 
+    while (1) {
+        free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        ESP_LOGW(TAG, "Free main memory: %zi", free_ram);
+        // fprintf(stderr, ".");
+        // fflush(stderr);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    };
     vTaskDelay(30000 / portTICK_PERIOD_MS);
     esp_restart();
-    // while (1) {
-    //     fprintf(stderr, ".");
-    //     fflush(stderr);
-    //     vTaskDelay(5000 / portTICK_PERIOD_MS);
-    // };
 
 #if 0
     vTaskDelay(5000 / portTICK_PERIOD_MS);

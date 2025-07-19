@@ -22,6 +22,7 @@
 #include "esp_log.h"
 #include "esp_private/esp_cache_private.h"
 #include "memory.h"
+#include "task.h"
 
 #include <sys/time.h>
 
@@ -38,9 +39,15 @@ typedef struct {
     TaskHandle_t        blocking_task;
     uint16_t            x;
     uint16_t            y;
+    task_info_t        *task_info;
 } managed_framebuffer_t;
 
+static int fb_count = 0;
+
 framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGW(TAG, "Mapping framebuffer for task %u", task_info->pid);
+
     size_t    num_pages        = 0;
     size_t    framebuffer_size = w * h * FRAMEBUFFER_BPP;
     uintptr_t vaddr_start      = framebuffer_vaddr_allocate(framebuffer_size, &num_pages);
@@ -78,7 +85,15 @@ framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
     framebuffer->framebuffer.h      = h;
     framebuffer->x                  = 0;
     framebuffer->y                  = 0;
+    framebuffer->task_info          = task_info;
 
+    if (fb_count > 2) {
+        framebuffer->x = (fb_count - 2) * w;
+        framebuffer->y = (fb_count - 2) * h;
+    }
+    fb_count++;
+
+    // vTaskPrioritySet(framebuffer->task_info->handle, TASK_PRIORITY_FOREGROUND);
     ESP_LOGI(
         TAG,
         "Allocated framebuffer at %p, pixels at %p, size %zi",
@@ -121,12 +136,16 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
     void      *framebuffers[2];
     lcd_device->_getfb(lcd_device, 1, &framebuffers[0]);
     lcd_device->_getfb(lcd_device, 2, &framebuffers[1]);
+
+    memset(framebuffers[0], 0, FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_H * FRAMEBUFFER_BPP);
+    memset(framebuffers[1], 0, FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_H * FRAMEBUFFER_BPP);
+
     bool cur_fb = true;
 
     ppa_srm_rotation_angle_t ppa_rotation;
-    ppa_rotation = PPA_SRM_ROTATION_ANGLE_90;
-    int x_offset = 0;
-    int y_offset = 0;
+    ppa_rotation = PPA_SRM_ROTATION_ANGLE_270;
+    int x_offset;
+    int y_offset;
 
     ppa_client_config_t ppa_srm_config = {
         .oper_type             = PPA_OPERATION_SRM,
@@ -148,6 +167,8 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
         // Wait for framebuffers to come in
         // ESP_LOGI(TAG, "Sleeping for %li ms", sleep_time);
         if (xQueueReceive(compositor_queue, &framebuffer, sleep_time / portTICK_PERIOD_MS) == pdTRUE) {
+            y_offset = FRAMEBUFFER_MAX_W - framebuffer->framebuffer.w - 1;
+
             // ESP_LOGI(TAG, "received framebuffers %p, pixels at %p, compositing to framebuffer %p", framebuffer,
             // framebuffer->framebuffer.pixels, framebuffers[cur_fb]); memcpy(framebuffers[cur_fb],
             // framebuffer->framebuffer.pixels, framebuffer->framebuffer.w * framebuffer->framebuffer.h * 2);
@@ -163,16 +184,12 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                 .in.block_offset_y = 0,
                 .in.srm_cm         = PPA_SRM_COLOR_MODE_RGB565,
 
-                .out.buffer      = framebuffers[cur_fb],
-                .out.buffer_size = 720 * 720 * FRAMEBUFFER_BPP,
-                .out.pic_w = (ppa_rotation == PPA_SRM_ROTATION_ANGLE_90 || ppa_rotation == PPA_SRM_ROTATION_ANGLE_270)
-                                 ? 720
-                                 : 720,
-                .out.pic_h = (ppa_rotation == PPA_SRM_ROTATION_ANGLE_90 || ppa_rotation == PPA_SRM_ROTATION_ANGLE_270)
-                                 ? 720
-                                 : 720,
-                .out.block_offset_x = 0,
-                .out.block_offset_y = 0,
+                .out.buffer         = framebuffers[cur_fb],
+                .out.buffer_size    = FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_H * FRAMEBUFFER_BPP,
+                .out.pic_w          = FRAMEBUFFER_MAX_W,
+                .out.pic_h          = FRAMEBUFFER_MAX_H,
+                .out.block_offset_x = framebuffer->x,
+                .out.block_offset_y = framebuffer->y,
                 .out.srm_cm         = PPA_SRM_COLOR_MODE_RGB565,
 
                 .rotation_angle = ppa_rotation,
@@ -182,6 +199,9 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                 .byte_swap      = 0,
                 .mode           = PPA_TRANS_MODE_BLOCKING,
             };
+
+            // ESP_LOGW(TAG, "Compositing %lu x %lu at offset %lu x %lu", framebuffer->framebuffer.w,
+            // framebuffer->framebuffer.h, oper_config.out.block_offset_x, oper_config.out.block_offset_y);
 
             // esp_cache_msync((void*)framebuffer->framebuffer.pixels, 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
             ESP_ERROR_CHECK(ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config));

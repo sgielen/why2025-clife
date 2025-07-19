@@ -37,6 +37,9 @@ KHASH_MAP_INIT_INT(restable, int);
 #define MAX_PID         127
 #define MIN_STACK_SIZE  8192
 
+#define TASK_PRIORITY            5
+#define TASK_PRIORITY_FOREGROUND 6
+
 typedef enum { RES_ICONV_OPEN, RES_REGCOMP, RES_OPEN, RES_RESOURCE_TYPE_MAX } task_resource_type_t;
 
 typedef enum {
@@ -102,7 +105,8 @@ __attribute__((always_inline)) inline static task_info_t *get_task_info() {
     return task_info;
 }
 
-void  task_init();
-pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
-void  task_record_resource_alloc(task_resource_type_t type, void *ptr);
-void  task_record_resource_free(task_resource_type_t type, void *ptr);
+void     task_init();
+pid_t    run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
+void     task_record_resource_alloc(task_resource_type_t type, void *ptr);
+void     task_record_resource_free(task_resource_type_t type, void *ptr);
+uint32_t get_num_tasks();

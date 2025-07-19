@@ -54,6 +54,7 @@ IRAM_ATTR static task_info_t       kernel_task = {
 static uint32_t          pid_free_bitmap[NUM_PIDS / 32];
 static SemaphoreHandle_t pid_free_bitmap_lock = NULL;
 static pid_t             next_pid;
+static uint32_t          num_tasks = 0;
 
 // Process table, each process gets a PID, which we track here.
 static task_info_t      *process_table[NUM_PIDS];
@@ -256,6 +257,7 @@ void IRAM_ATTR cerberos() {
 }
 
 void IRAM_ATTR __wrap_xt_unhandled_exception(void *frame) {
+#if 0
     task_info_t *task_info = get_task_info();
     if (task_info && task_info->pid) {
         esp_rom_printf("Task %u caused an unhandled exception, Cerberos will deal with it\n", task_info->pid);
@@ -265,6 +267,7 @@ void IRAM_ATTR __wrap_xt_unhandled_exception(void *frame) {
                          : "r"(cerberos)
                          : "t0", "memory");
     }
+#endif
     __real_xt_unhandled_exception(frame);
 }
 
@@ -293,6 +296,7 @@ static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
                 // Don't free our PID until the last moment
                 pid_free(dead_pid);
                 ESP_LOGI("HADES", "Task %d escorted to my realm", dead_pid);
+                --num_tasks;
             } else {
                 ESP_LOGE("HADES", "Task %d has no task info?", dead_pid);
             }
@@ -448,6 +452,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
     sprintf(task_name, "Task %i", (uint8_t)pid);
 
     // xTaskCreate(generic_task, task_name, stack_size, (void *)task_info, 5, NULL);
+    ++num_tasks;
     xTaskCreatePinnedToCore(generic_task, task_name, stack_size, (void *)task_info, 5, NULL, 1);
 
     return pid;
@@ -469,6 +474,10 @@ void IRAM_ATTR task_switched_out_hook(TaskHandle_t volatile *handle) {
         // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
         unmap_task(task_info);
     }
+}
+
+uint32_t get_num_tasks() {
+    return num_tasks;
 }
 
 void task_init() {

@@ -1,31 +1,30 @@
-#include <errno.h>
-#include <string.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 
-__asm__(
-    ".section .note.vmem_info, \"a\", @note\n"
-    ".balign 4\n"
-    ".long 2f - 1f\n"        // namesz
-    ".long 4f - 3f\n"        // descsz
-    ".long 0x12345678\n"     // type (custom)
-    "1: .asciz \"VMEM\"\n"   // name
-    "2: .balign 4\n"
-    "3: .long 1048576\n"     // 1MB virtual memory requirement
-    "4: .balign 4\n"
-);
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+__asm__(".section .note.vmem_info, \"a\", @note\n"
+        ".balign 4\n"
+        ".long 2f - 1f\n"      // namesz
+        ".long 4f - 3f\n"      // descsz
+        ".long 0x12345678\n"   // type (custom)
+        "1: .asciz \"VMEM\"\n" // name
+        "2: .balign 4\n"
+        "3: .long 1048576\n" // 1MB virtual memory requirement
+        "4: .balign 4\n");
 
 int main(int argc, char *argv[]) {
-	fprintf(stdout, "Hello ELF world A!\n");
+    fprintf(stdout, "Hello ELF world A!\n");
 
-    void* x1 = malloc(2 * 1024 * 1024);
+    void *x1 = malloc(2 * 1024 * 1024);
     printf("Got pointer %p\n", x1);
 
     FILE *f = fopen("FLASH0:TESTFILE", "r");
     printf("fopen: %p\n", f);
     if (f) {
-        char *x = malloc(1024);
+        char  *x = malloc(1024);
         size_t r = fread(x, 1, 1000, f);
         printf("Read: %zi bytes\n", r);
         x[r] = '\0';
@@ -33,14 +32,14 @@ int main(int argc, char *argv[]) {
         fclose(f);
     }
 
-    void* x2 = malloc(2 * 1024 * 1024);
+    void *x2 = malloc(2 * 1024 * 1024);
     printf("Got pointer %p\n", x2);
 
-    //f = fopen("SEARCH:ANOTHERFILE.NAME", "r");
+    // f = fopen("SEARCH:ANOTHERFILE.NAME", "r");
     f = fopen("SEARCH:NONEXISTENT", "r");
     printf("fopen: %p\n", f);
     if (f) {
-        char *x = malloc(1024);
+        char  *x = malloc(1024);
         size_t r = fread(x, 1, 1000, f);
         printf("Read: %zi bytes\n", r);
         x[r] = '\0';
@@ -50,14 +49,14 @@ int main(int argc, char *argv[]) {
         printf("********** Failed to open File (%s)!\n", strerror(errno));
     }
 
-    void* x3 = malloc(2 * 1024 * 1024);
+    void *x3 = malloc(2 * 1024 * 1024);
     printf("Got pointer %p\n", x3);
 
     f = fopen("FLASH0:[SUBDIR.ANOTHER]NEW_FILE", "w+");
     printf("fopen: %p\n", f);
     if (f) {
-        const char *l = "This is a test write";
-        size_t r = fwrite(l, 1, strlen(l), f);
+        char const *l = "This is a test write";
+        size_t      r = fwrite(l, 1, strlen(l), f);
         printf("Write %zi bytes\n", r);
         fclose(f);
     }
@@ -65,14 +64,14 @@ int main(int argc, char *argv[]) {
     f = fopen("FLASH0:[SUBDIR.ANOTHER]NEW_FILE", "r");
     printf("fopen: %p\n", f);
     if (f) {
-        char *x = malloc(1024);
+        char  *x = malloc(1024);
         size_t r = fread(x, 1, 1000, f);
         printf("Read: %zi bytes\n", r);
         x[r] = '\0';
         printf("String: %s\n", x);
     }
 
-    void* x4 = malloc(2 * 1024 * 1024);
+    void *x4 = malloc(2 * 1024 * 1024);
     printf("Got pointer %p\n", x4);
 
     free(x3);
@@ -80,5 +79,5 @@ int main(int argc, char *argv[]) {
     free(x1);
     free(x2);
 
-	return 0;
+    return 0;
 }

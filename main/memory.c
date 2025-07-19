@@ -38,8 +38,8 @@
 
 #include <errno.h>
 
-static allocator_t page_allocator;
-static allocator_t framebuffer_allocator;
+static allocator_t       page_allocator;
+static allocator_t       framebuffer_allocator;
 static SemaphoreHandle_t cache_lock = NULL;
 
 typedef struct {
