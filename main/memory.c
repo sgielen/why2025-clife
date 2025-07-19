@@ -40,6 +40,7 @@
 
 static allocator_t page_allocator;
 static allocator_t framebuffer_allocator;
+static SemaphoreHandle_t cache_lock = NULL;
 
 typedef struct {
     uint32_t         start;   // laddr start
@@ -116,13 +117,35 @@ __attribute__((always_inline)) static inline void
 }
 
 __attribute__((always_inline)) static inline void invalidate_caches(uintptr_t vaddr_start, uint32_t len) {
-    esp_cache_msync((void*)vaddr_start, len, ESP_CACHE_MSYNC_FLAG_DIR_M2C | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
+    cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    cache_ll_l1_invalidate_dcache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    cache_ll_l2_invalidate_cache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
 }
 
 __attribute__((always_inline)) static inline void writeback_caches(uintptr_t vaddr_start, uint32_t len) {
-    esp_cache_msync((void*)vaddr_start, len, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
     // cache_ll_writeback_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL);
-    // cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
+    cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
+}
+
+IRAM_ATTR esp_err_t __wrap_esp_cache_msync(void *addr, size_t size, int flags) {
+    spi_flash_disable_interrupts_caches_and_other_cpu();
+    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_C2M) {
+        writeback_caches((uintptr_t)addr, size);
+        spi_flash_enable_interrupts_caches_and_other_cpu();
+        return 0;
+    }
+
+    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_M2C) {
+        invalidate_caches((uintptr_t)addr, size);
+        spi_flash_enable_interrupts_caches_and_other_cpu();
+        return 0;
+    }
+
+    writeback_caches((uintptr_t)addr, size);
+    invalidate_caches((uintptr_t)addr, size);
+
+    spi_flash_enable_interrupts_caches_and_other_cpu();
+    return 0;
 }
 
 __attribute__((always_inline)) static inline void
@@ -558,6 +581,7 @@ void IRAM_ATTR memory_init() {
         0
     );
 
+    cache_lock = xSemaphoreCreateMutex();
     init_memory_heap_caps();
     print_allocator(&page_allocator);
 }
