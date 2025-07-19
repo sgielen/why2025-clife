@@ -8,8 +8,8 @@ variables:
 
 # Define common build and merge script steps
 .common_build_script: &common_build_script_definition
-  - 'echo "Setting ESP-IDF target to: ${IDF_TARGET}"'
-  - idf.py set-target "${IDF_TARGET}"
+  # - 'echo "Setting ESP-IDF target to: ${IDF_TARGET}"'
+  # - idf.py set-target "${IDF_TARGET}"
   - 'echo "Starting ESP-IDF project build..."'
   - idf.py build
   - 'echo "ESP-IDF project build completed."'
