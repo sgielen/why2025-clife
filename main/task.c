@@ -349,11 +349,6 @@ out:
 static void generic_task(void *ti) {
     // Final setup to be done inside of the task context before we launch our entrypoint
     task_info_t *task_info = ti;
-    TaskHandle_t handle    = xTaskGetCurrentTaskHandle();
-    task_info->handle      = handle;
-    process_table_add_task(task_info);
-    vTaskSetThreadLocalStoragePointerAndDelCallback(handle, 0, task_info, task_killed);
-
     // ESP_LOGI(TAG, "Setting watchpoint on %p core %i", &task_info->pad, esp_cpu_get_core_id());
     // esp_cpu_set_watchpoint(0, &task_info->pad, 4, ESP_CPU_WATCHPOINT_STORE);
 
@@ -453,8 +448,13 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
 
     // xTaskCreate(generic_task, task_name, stack_size, (void *)task_info, 5, NULL);
     ++num_tasks;
-    xTaskCreatePinnedToCore(generic_task, task_name, stack_size, (void *)task_info, 5, NULL, 1);
-
+    TaskHandle_t new_task;
+    xTaskCreatePinnedToCore(generic_task, task_name, stack_size, (void *)task_info, 5, &new_task, 1);
+    vTaskSuspend(new_task);
+    task_info->handle = new_task;
+    process_table_add_task(task_info);
+    vTaskSetThreadLocalStoragePointerAndDelCallback(new_task, 0, task_info, task_killed);
+    vTaskResume(new_task);
     return pid;
 }
 
@@ -468,12 +468,14 @@ void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
 }
 
 void IRAM_ATTR task_switched_out_hook(TaskHandle_t volatile *handle) {
+#if 0
     task_info_t *task_info = get_task_info();
     if (task_info && task_info->pid) {
         // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
         // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
         unmap_task(task_info);
     }
+#endif
 }
 
 uint32_t get_num_tasks() {
