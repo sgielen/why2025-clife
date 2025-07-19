@@ -36,10 +36,10 @@ typedef struct {
     framebuffer_t       framebuffer;
     allocation_range_t *pages;
     size_t              num_pages;
-    TaskHandle_t        blocking_task;
     uint16_t            x;
     uint16_t            y;
     task_info_t        *task_info;
+    SemaphoreHandle_t   ready;
 } managed_framebuffer_t;
 
 static int fb_count = 0;
@@ -86,6 +86,7 @@ framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
     framebuffer->x                  = 0;
     framebuffer->y                  = 0;
     framebuffer->task_info          = task_info;
+    framebuffer->ready              = xSemaphoreCreateBinary();
 
     if (fb_count > 2) {
         framebuffer->x = (fb_count - 2) * w;
@@ -117,17 +118,11 @@ void framebuffer_post(framebuffer_t *framebuffer, bool block) {
     ESP_LOGV(TAG, "Posting framebuffer %p", framebuffer);
 
     // This is safe because framebuffers do not get allocated in user space
-    if (block) {
-        managed_framebuffer->blocking_task = xTaskGetCurrentTaskHandle();
-    } else {
-        managed_framebuffer->blocking_task = NULL;
-    }
-
     xQueueSend(compositor_queue, &managed_framebuffer, portMAX_DELAY);
 
     if (block) {
         ESP_LOGV(TAG, "Suspending myself");
-        vTaskSuspend(NULL);
+        xSemaphoreTake(managed_framebuffer->ready, portMAX_DELAY);
     }
 }
 
@@ -209,10 +204,7 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
 
             // esp_cache_msync((void*)framebuffer->framebuffer.pixels, 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
             ESP_ERROR_CHECK(ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config));
-            if (framebuffer->blocking_task) {
-                vTaskResume(framebuffer->blocking_task);
-                framebuffer->blocking_task = NULL;
-            }
+            xSemaphoreGive(framebuffer->ready);
             changes = true;
 
             clock_gettime(CLOCK_MONOTONIC, &end_time);
