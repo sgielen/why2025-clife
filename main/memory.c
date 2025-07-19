@@ -477,9 +477,18 @@ static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
     size_t        p;
     int           errct       = 0;
     int           initial_err = -1;
+
+    ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Starting write");
     for (p = 0; p < (size / sizeof(int)); p += 8) {
         spiram[p] = p ^ 0xAAAAAAAA;
     }
+
+    ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Writing back pages");
+    writeback_caches(v_start, size);
+    ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Invalidate pages");
+    invalidate_caches(v_start, size);
+
+    ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Starting read");
     for (p = 0; p < (size / sizeof(int)); p += 8) {
         if (spiram[p] != (p ^ 0xAAAAAAAA)) {
             errct++;
