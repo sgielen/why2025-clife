@@ -117,13 +117,17 @@ void framebuffer_post(framebuffer_t *framebuffer, bool block) {
     ESP_LOGV(TAG, "Posting framebuffer %p", framebuffer);
 
     // This is safe because framebuffers do not get allocated in user space
-    xQueueSend(compositor_queue, &managed_framebuffer, portMAX_DELAY);
     if (block) {
-        ESP_LOGV(TAG, "Suspending myself");
         managed_framebuffer->blocking_task = xTaskGetCurrentTaskHandle();
-        vTaskSuspend(NULL);
     } else {
         managed_framebuffer->blocking_task = NULL;
+    }
+
+    xQueueSend(compositor_queue, &managed_framebuffer, portMAX_DELAY);
+
+    if (block) {
+        ESP_LOGV(TAG, "Suspending myself");
+        vTaskSuspend(NULL);
     }
 }
 
