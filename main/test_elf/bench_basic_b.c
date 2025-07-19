@@ -1,3 +1,4 @@
+#include "misc_funcs.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -38,12 +39,14 @@ int main(int argc, char *argv[]) {
                         if (t != task_id) {
                             printf(
                                 "\033[0;31mError unexpected memory contents! expected 0x%X got 0x%X (%c) in ptr number "
-                                "%i\033[0m\n",
+                                "%i, vaddr %p\033[0m\n",
                                 task_id,
                                 t,
                                 t,
-                                (i - 50) % 100
+                                (i - 50) % 100,
+                                &ptrs[(i - 50) % 100]
                             );
+                            die("Unexpected memory contents in memory bench");
                             return 1;
                         }
                         ptrs[(i - 50) % 100][k] = '$';

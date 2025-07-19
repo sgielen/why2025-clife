@@ -38,6 +38,10 @@ extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 
 static char const *TAG = "wrapped_functions";
 
+IRAM_ATTR void why_die(char const *reason) {
+    esp_system_abort(reason);
+}
+
 char *why_strerror(int errnum) {
     task_info_t *task_info = get_task_info();
     return strerror_r(errnum, task_info->psram->strerror_buf, STRERROR_BUFLEN);

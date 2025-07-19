@@ -1,6 +1,23 @@
 ---
 include:
+  - complex.h
+  - compositor.h
+  - ctype.h
+  - fenv.h
+  - float.h
+  - fnmatch.h
+  - getopt.h
+  - iconv.h
+  - ieeefp.h
+  - inttypes.h
+  - langinfo.h
+  - locale.h
+  - math.h
+  - misc_funcs.h
+  - regex.h
   - sdkconfig.h
+  - search.h
+  - setjmp.h
   - stddef.h
   - stdio.h
   - stdlib.h
@@ -10,24 +27,8 @@ include:
   - sys/types.h
   - time.h
   - unistd.h
-  - ctype.h
-  - fenv.h
-  - float.h
-  - fnmatch.h
-  - getopt.h
-  - ieeefp.h
-  - inttypes.h
-  - langinfo.h
-  - locale.h
-  - math.h
-  - regex.h
-  - search.h
-  - setjmp.h
   - wchar.h
   - wctype.h
-  - complex.h
-  - iconv.h
-  - compositor.h
 
 simple_function:
 # libc.a
@@ -896,6 +897,7 @@ wrapped_function:
   - calloc
   - close
   - ctime
+  - die
   - fclose
   - fdopen
   - feof
