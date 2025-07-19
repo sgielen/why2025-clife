@@ -503,6 +503,16 @@ static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
     }
 }
 
+uint32_t vaddr_to_paddr(uint32_t vaddr) {
+    uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
+
+    uint32_t paddr;
+    mmu_target_t target;
+    mmu_hal_vaddr_to_paddr(mmu_id, vaddr, &paddr, &target);
+
+    return paddr;
+}
+
 void IRAM_ATTR memory_init() {
     for (int i = 0; i < SOC_MMU_LINEAR_ADDRESS_REGION_NUM; i++) {
         ESP_LOGI(TAG, "MMU Region  %u", i);

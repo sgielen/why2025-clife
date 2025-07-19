@@ -877,6 +877,7 @@ simple_function:
   - framebuffer_allocate
   - framebuffer_free
   - framebuffer_post
+  - vaddr_to_paddr
 
 simple_function_extern:
   - __adddf3
