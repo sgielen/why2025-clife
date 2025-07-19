@@ -1,0 +1,63 @@
+image: espressif/idf:v5.4.2
+
+stages:
+  - build_and_merge
+
+variables:
+  IDF_TARGET: esp32p4
+
+# Define common build and merge script steps
+.common_build_script: &common_build_script_definition
+  - 'echo "Setting ESP-IDF target to: ${IDF_TARGET}"'
+  - idf.py set-target "${IDF_TARGET}"
+  - 'echo "Starting ESP-IDF project build..."'
+  - idf.py build
+  - 'echo "ESP-IDF project build completed."'
+
+  - 'echo "Output binary filename will be: ${OUTPUT_FILENAME}"'
+  - 'echo "Using idf.py to merge binaries into ${OUTPUT_FILENAME}..."'
+  - idf.py merge-bin -o "${OUTPUT_FILENAME}"
+  - 'echo "Binary merge completed. Output file: ${OUTPUT_FILENAME}"'
+  - ls -l "build/${OUTPUT_FILENAME}"
+
+# Template for build and merge jobs, defines common stage
+.build_and_merge_template:
+  stage: build_and_merge
+
+# Job for non-tag builds (e.g., branches like 'main')
+# Artifacts expire after 1 week
+build_and_merge_non_tag:
+  extends: .build_and_merge_template
+  variables:
+    BASE_OUTPUT_FILENAME: "${CI_PROJECT_NAME}_${CI_COMMIT_SHORT_SHA}"
+    OUTPUT_FILENAME: "${BASE_OUTPUT_FILENAME}.bin"
+  script:
+    - 'echo "Building from branch ${CI_COMMIT_REF_NAME}, identifier: ${CI_COMMIT_SHORT_SHA}"'
+    - *common_build_script_definition
+  artifacts:
+    paths:
+      - "build/${OUTPUT_FILENAME}"
+    name: "${BASE_OUTPUT_FILENAME}"
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_TAG == null' # Only run if not a tag
+      when: on_success
+
+# Job for tag builds
+# Artifacts never expire, suitable for releases
+build_and_merge_tag:
+  extends: .build_and_merge_template
+  variables:
+    BASE_OUTPUT_FILENAME: "${CI_PROJECT_NAME}_${CI_COMMIT_TAG}"
+    OUTPUT_FILENAME: "${BASE_OUTPUT_FILENAME}.bin"
+  script:
+    - 'echo "Building from tag: ${CI_COMMIT_TAG}"'
+    - *common_build_script_definition
+  artifacts:
+    paths:
+      - "build/${OUTPUT_FILENAME}"
+    name: "${BASE_OUTPUT_FILENAME}"
+    expire_in: never
+  rules:
+    - if: '$CI_COMMIT_TAG' # Only run if it is a tag
+      when: on_success
