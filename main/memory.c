@@ -38,9 +38,8 @@
 
 #include <errno.h>
 
-static allocator_t  page_allocator;
-static allocator_t  framebuffer_allocator;
-static portMUX_TYPE mmu_cache_lock = portMUX_INITIALIZER_UNLOCKED;
+static allocator_t page_allocator;
+static allocator_t framebuffer_allocator;
 
 typedef struct {
     uint32_t         start;   // laddr start
@@ -180,9 +179,9 @@ __attribute__((always_inline)) static inline void writeback_caches(uintptr_t vad
 
 IRAM_ATTR esp_err_t __wrap_esp_cache_msync(void *addr, size_t size, int flags) {
     spi_flash_disable_interrupts_caches_and_other_cpu();
-    __real_esp_cache_msync(addr, size, flags);
+    esp_err_t ret = __real_esp_cache_msync(addr, size, flags);
     spi_flash_enable_interrupts_caches_and_other_cpu();
-    return 0;
+    return ret;
 }
 
 __attribute__((always_inline)) static inline void
@@ -264,7 +263,6 @@ void IRAM_ATTR remap_task(task_info_t *task_info) {
     allocation_range_t *r = task_info->allocations;
     while (r) {
         why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
-        invalidate_caches(r->vaddr_start, r->size);
         r = r->next;
     }
 
@@ -402,13 +400,12 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
             goto error;
         }
 
-        allocation_range_t *head_range = NULL;
-        allocation_range_t *tail_range = NULL;
-
         uint32_t pages = increment / SOC_MMU_PAGE_SIZE;
 
         // Ranges are in reverse order, when we insert our new ranges into
         // the task_info this range needs to be tied to the old head
+        allocation_range_t *head_range = NULL;
+        allocation_range_t *tail_range = NULL;
 
         if (!pages_allocate(vaddr_start, pages, &head_range, &tail_range)) {
             goto error;
@@ -424,6 +421,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
             task_info->allocations
         );
 
+        // Map our new page table entries in one atomic operation
         spi_flash_disable_interrupts_caches_and_other_cpu();
         map_regions(head_range, tail_range);
 
@@ -440,7 +438,6 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
         uint32_t mmu_id           = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
 
         allocation_range_t *r = task_info->allocations;
-        spi_flash_disable_interrupts_caches_and_other_cpu();
         while (r && to_decrement) {
             // We always free from the end
             if (r->size <= to_decrement) {
@@ -452,15 +449,19 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     (void *)r->paddr_start,
                     r->size
                 );
-                why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
-
+                // Don't try to deallocate a page with caches disabled
                 page_deallocate(r->paddr_start);
+                allocation_range_t *n = r->next;
 
-                to_decrement          -= r->size;
-                allocation_range_t *n  = r->next;
-                free(r);
+                // Unmap and change the page table entries in one atomic operation
+                spi_flash_disable_interrupts_caches_and_other_cpu();
+                why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
                 task_info->allocations = n;
-                r                      = n;
+                spi_flash_enable_interrupts_caches_and_other_cpu();
+
+                to_decrement -= r->size;
+                free(r);
+                r = n;
             } else {
                 // Current block is larger than we want to decrement
                 ESP_LOGI(
@@ -472,14 +473,14 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     to_decrement
                 );
 
-                // Make sure that all existing ram is written
+                // Write back, unmap, remap, and invalidate in one atomic operation
+                spi_flash_disable_interrupts_caches_and_other_cpu();
                 writeback_caches(r->vaddr_start, r->size - to_decrement);
-                // Unmap the whole region
                 why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
-                // Remap the smaller region
                 r->size -= to_decrement;
                 why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
                 invalidate_caches(r->vaddr_start, r->size);
+                spi_flash_enable_interrupts_caches_and_other_cpu();
 
                 page_deallocate(r->paddr_start + to_decrement);
                 to_decrement = 0;
@@ -487,7 +488,6 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
         }
         task_info->heap_size -= decrement_amount;
         task_info->heap_end  -= decrement_amount;
-        spi_flash_enable_interrupts_caches_and_other_cpu();
     }
 
 out:
