@@ -14,11 +14,6 @@
 #ifndef __ASSEMBLER__
     /* For configASSERT() */
     #include <assert.h>
-    struct tskTaskControlBlock;
-    extern void task_switched_in_hook(struct tskTaskControlBlock * volatile*);
-    extern void task_switched_out_hook(struct tskTaskControlBlock * volatile*);
-    #define traceTASK_SWITCHED_IN()  task_switched_in_hook(pxCurrentTCBs)
-    #define traceTASK_SWITCHED_OUT()  task_switched_out_hook(pxCurrentTCBs)
 #endif /* def __ASSEMBLER__ */
 
 /* ----------------------------------------------------- Helpers -------------------------------------------------------
@@ -317,7 +312,5 @@
     // For task swiching in BadgeVMS
     struct tskTaskControlBlock;
     extern void task_switched_in_hook(struct tskTaskControlBlock * volatile*);
-    extern void task_switched_out_hook(struct tskTaskControlBlock * volatile*);
     #define traceTASK_SWITCHED_IN()  task_switched_in_hook(pxCurrentTCBs)
-    #define traceTASK_SWITCHED_OUT()  task_switched_out_hook(pxCurrentTCBs)
 #endif /* def __ASSEMBLER__ */

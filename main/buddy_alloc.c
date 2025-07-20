@@ -355,29 +355,28 @@ void print_list(memory_pool_t *pool, buddy_block_t *list, size_t *total) {
         ++blocks;
         block       = block->prev;
         list_total += 1 << block->order;
-        ESP_LOGI(TAG, "(%zi) ", block_to_index(pool, block));
+        esp_rom_printf("(%u) ", block_to_index(pool, block));
     }
     *total += list_total;
-    ESP_LOGI(TAG, "%zu blocks (%zi pages)", blocks, list_total);
+    esp_rom_printf("%u blocks (%u pages)\n", blocks, list_total);
 }
 
 void print_allocator(allocator_t *allocator) {
     for (int p = 0; p < allocator->memory_pool_num; ++p) {
         memory_pool_t *pool = &allocator->memory_pools[p];
-        ESP_LOGI(TAG, "Pool %i: ", p);
+        esp_rom_printf("Pool %u: \n", p);
 
         size_t total = 0;
         for (int i = 0; i <= pool->max_order; ++i) {
-            ESP_LOGI(TAG, "Order %i, ", i);
+            esp_rom_printf("Order %u, ", i);
             print_list(pool, &pool->free_lists[i], &total);
         }
 
-        ESP_LOGI(TAG, "Waste: ");
+        esp_rom_printf("Waste: ");
         print_list(pool, &pool->waste_list, &total);
 
-        ESP_LOGI(
-            TAG,
-            "Total free pages: (calculated) %li (stored) %zi max_order_free: %i",
+        esp_rom_printf(
+            "Total free pages: (calculated) %u (stored) %u max_order_free: %u\n",
             total - pool->max_order_waste,
             pool->free_pages,
             pool->max_order_free

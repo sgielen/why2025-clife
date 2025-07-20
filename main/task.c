@@ -118,6 +118,10 @@ error:
     return pid;
 }
 
+task_info_t *get_taskinfo_for_pid(pid_t pid) {
+    return process_table[pid];
+}
+
 static void pid_free(pid_t pid) {
     uint32_t word_idx = pid / 32;
     uint32_t bit_idx  = pid % 32;
@@ -465,17 +469,6 @@ void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
         // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
         remap_task(task_info);
     }
-}
-
-void IRAM_ATTR task_switched_out_hook(TaskHandle_t volatile *handle) {
-#if 0
-    task_info_t *task_info = get_task_info();
-    if (task_info && task_info->pid) {
-        // ESP_DRAM_LOGW(DRAM_STR("task_switched_hook"), "Switching to task %u, heap_start %p, heap_end %p",
-        // task_info->pid, (void*)task_info->heap_start, (void*)task_info->heap_end);
-        unmap_task(task_info);
-    }
-#endif
 }
 
 uint32_t get_num_tasks() {

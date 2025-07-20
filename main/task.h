@@ -105,8 +105,9 @@ __attribute__((always_inline)) inline static task_info_t *get_task_info() {
     return task_info;
 }
 
-void     task_init();
-pid_t    run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
-void     task_record_resource_alloc(task_resource_type_t type, void *ptr);
-void     task_record_resource_free(task_resource_type_t type, void *ptr);
-uint32_t get_num_tasks();
+void         task_init();
+pid_t        run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]);
+void         task_record_resource_alloc(task_resource_type_t type, void *ptr);
+void         task_record_resource_free(task_resource_type_t type, void *ptr);
+uint32_t     get_num_tasks();
+task_info_t *get_taskinfo_for_pid(pid_t pid);

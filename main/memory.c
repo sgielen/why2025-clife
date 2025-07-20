@@ -38,9 +38,9 @@
 
 #include <errno.h>
 
-static allocator_t       page_allocator;
-static allocator_t       framebuffer_allocator;
-static SemaphoreHandle_t cache_lock = NULL;
+static allocator_t  page_allocator;
+static allocator_t  framebuffer_allocator;
+static portMUX_TYPE mmu_cache_lock = portMUX_INITIALIZER_UNLOCKED;
 
 typedef struct {
     uint32_t         start;   // laddr start
@@ -56,14 +56,34 @@ extern mmu_mem_region_t const g_mmu_mem_regions[SOC_MMU_LINEAR_ADDRESS_REGION_NU
 extern void spi_flash_enable_interrupts_caches_and_other_cpu(void);
 extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 
-extern void spi_flash_restore_cache(uint32_t cpuid, uint32_t saved_state);
-extern void spi_flash_disable_cache(uint32_t cpuid, uint32_t saved_state);
+extern void      spi_flash_restore_cache(uint32_t cpuid, uint32_t saved_state);
+extern void      spi_flash_disable_cache(uint32_t cpuid, uint32_t saved_state);
+extern esp_err_t __real_esp_cache_msync(void *addr, size_t size, int flags);
 
 extern void        init_memory_heap_caps();
 static char const *TAG = "memory";
 
 IRAM_ATTR void dump_mmu() {
     uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
+
+    for (pid_t pid = 0; pid < MAX_PID; ++pid) {
+        task_info_t *task_info = get_taskinfo_for_pid(pid);
+        if (!task_info)
+            continue;
+
+        esp_rom_printf("\n*********** PID %02u MAP   ***********\n", task_info->pid);
+        allocation_range_t *r = task_info->allocations;
+        while (r) {
+            for (int i = 0; i < r->size / SOC_MMU_PAGE_SIZE; ++i) {
+                esp_rom_printf(
+                    "vaddr 0x%08lx -> paddr 0x%08lx\n",
+                    r->vaddr_start + (i * SOC_MMU_PAGE_SIZE),
+                    r->paddr_start + (i * SOC_MMU_PAGE_SIZE)
+                );
+            }
+            r = r->next;
+        }
+    }
 
     esp_rom_printf("\n*********** MMU DUMP START ***********\n");
     for (int i = 0; i < SOC_MMU_ENTRY_NUM; i++) {
@@ -126,7 +146,16 @@ __attribute__((always_inline)) static inline void
     mmu_val = mmu_ll_format_paddr(mmu_id, paddr, mem_type);
 
     while (page_num) {
-        entry_id = mmu_ll_get_entry_id(mmu_id, vaddr);
+        entry_id       = mmu_ll_get_entry_id(mmu_id, vaddr);
+        uint32_t entry = mmu_ll_read_entry(mmu_id, entry_id);
+        if (entry) {
+            esp_rom_printf(
+                "Entry %u was already mapped, currently mappedd page 0x%08x\n",
+                entry_id,
+                (entry & ~0xC00) << 16
+            );
+            esp_system_abort("Unexpected mmu state");
+        }
         mmu_ll_write_entry(mmu_id, entry_id, mmu_val, mem_type);
         vaddr += page_size_in_bytes;
         mmu_val++;
@@ -135,33 +164,23 @@ __attribute__((always_inline)) static inline void
 }
 
 __attribute__((always_inline)) static inline void invalidate_caches(uintptr_t vaddr_start, uint32_t len) {
+    cache_bus_mask_t bus_mask = cache_ll_l1_get_bus(0, vaddr_start, len);
+    cache_ll_l1_enable_bus(0, bus_mask);
+    bus_mask = cache_ll_l1_get_bus(1, vaddr_start, len);
+    cache_ll_l1_enable_bus(1, bus_mask);
+
     cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
     cache_ll_l1_invalidate_dcache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
     cache_ll_l2_invalidate_cache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
 }
 
 __attribute__((always_inline)) static inline void writeback_caches(uintptr_t vaddr_start, uint32_t len) {
-    // cache_ll_writeback_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL);
     cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
 }
 
 IRAM_ATTR esp_err_t __wrap_esp_cache_msync(void *addr, size_t size, int flags) {
     spi_flash_disable_interrupts_caches_and_other_cpu();
-    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_C2M) {
-        writeback_caches((uintptr_t)addr, size);
-        spi_flash_enable_interrupts_caches_and_other_cpu();
-        return 0;
-    }
-
-    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_M2C) {
-        invalidate_caches((uintptr_t)addr, size);
-        spi_flash_enable_interrupts_caches_and_other_cpu();
-        return 0;
-    }
-
-    writeback_caches((uintptr_t)addr, size);
-    invalidate_caches((uintptr_t)addr, size);
-
+    __real_esp_cache_msync(addr, size, flags);
     spi_flash_enable_interrupts_caches_and_other_cpu();
     return 0;
 }
@@ -175,7 +194,12 @@ __attribute__((always_inline)) static inline void
     uint32_t page_num = (len + page_size_in_bytes - 1) / page_size_in_bytes;
     uint32_t entry_id = 0;
     while (page_num) {
-        entry_id = mmu_ll_get_entry_id(mmu_id, vaddr);
+        entry_id       = mmu_ll_get_entry_id(mmu_id, vaddr);
+        uint32_t entry = mmu_ll_read_entry(mmu_id, entry_id);
+        if (!entry) {
+            esp_rom_printf("Entry %u was not mapped\n", entry_id);
+            esp_system_abort("Unexpected mmu state");
+        }
         mmu_ll_set_entry_invalid(mmu_id, entry_id);
         vaddr += page_size_in_bytes;
         page_num--;
@@ -201,24 +225,20 @@ __attribute__((always_inline)) static inline void
             r->size,
             r->next
         );
-        spi_flash_disable_interrupts_caches_and_other_cpu();
+
         why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
-        // Give other tasks a chance
-        spi_flash_enable_interrupts_caches_and_other_cpu();
         total_size += r->size;
         r           = r->next;
     }
 
     // Invalidate all caches at once
-    spi_flash_disable_interrupts_caches_and_other_cpu();
     invalidate_caches(start, total_size);
-    spi_flash_enable_interrupts_caches_and_other_cpu();
 }
 
-static task_info_t *current_mapped_task = NULL;
+static pid_t current_mapped_task = 0;
 
 void IRAM_ATTR remap_task(task_info_t *task_info) {
-    if (current_mapped_task == task_info) {
+    if (current_mapped_task == task_info->pid) {
         // ESP_DRAM_LOGW(DRAM_STR("remap_task"), "Current task already mapped?");
         return;
     } else {
@@ -231,8 +251,9 @@ void IRAM_ATTR remap_task(task_info_t *task_info) {
     // Unmap and write back whatever was in our address space
     for (int i = entry_id; i < SOC_MMU_ENTRY_NUM; i++) {
         uint32_t entry = mmu_ll_read_entry(mmu_id, i);
-        if (!entry)
+        if (!entry) {
             break;
+        }
 
         // ESP_DRAM_LOGW(DRAM_STR("remap_task"), "Unmapping vaddr 0x%08X, paddr 0x%08X", SOC_EXTRAM_LOW + (i *
         // SOC_MMU_PAGE_SIZE), (entry & ~0xC00) << 16);
@@ -249,21 +270,7 @@ void IRAM_ATTR remap_task(task_info_t *task_info) {
 
     // Invalidate all caches at once
     invalidate_caches(task_info->heap_start, task_info->heap_size);
-    current_mapped_task = task_info;
-}
-
-void IRAM_ATTR unmap_task(task_info_t *task_info) {
-    uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
-
-    allocation_range_t *r = task_info->allocations;
-
-    // Ensure we wrote back all caches
-    writeback_caches(task_info->heap_start, task_info->heap_size);
-
-    while (r) {
-        why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
-        r = r->next;
-    }
+    current_mapped_task = task_info->pid;
 }
 
 IRAM_ATTR void pages_deallocate(allocation_range_t *head_range) {
@@ -374,7 +381,9 @@ void IRAM_ATTR framebuffer_vaddr_deallocate(uintptr_t start_address) {
 }
 
 void IRAM_ATTR framebuffer_map_pages(allocation_range_t *head_range, allocation_range_t *tail_range) {
+    spi_flash_disable_interrupts_caches_and_other_cpu();
     map_regions(head_range, tail_range);
+    spi_flash_enable_interrupts_caches_and_other_cpu();
 }
 
 void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
@@ -415,6 +424,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
             task_info->allocations
         );
 
+        spi_flash_disable_interrupts_caches_and_other_cpu();
         map_regions(head_range, tail_range);
 
         tail_range->next       = task_info->allocations;
@@ -422,6 +432,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
 
         task_info->heap_size += increment;
         task_info->heap_end  += increment;
+        spi_flash_enable_interrupts_caches_and_other_cpu();
     } else {
         // increment is negative
         int32_t  decrement_amount = task_info->heap_size + increment;
@@ -429,6 +440,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
         uint32_t mmu_id           = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
 
         allocation_range_t *r = task_info->allocations;
+        spi_flash_disable_interrupts_caches_and_other_cpu();
         while (r && to_decrement) {
             // We always free from the end
             if (r->size <= to_decrement) {
@@ -440,9 +452,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     (void *)r->paddr_start,
                     r->size
                 );
-                spi_flash_disable_interrupts_caches_and_other_cpu();
                 why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
-                spi_flash_enable_interrupts_caches_and_other_cpu();
 
                 page_deallocate(r->paddr_start);
 
@@ -462,7 +472,6 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                     to_decrement
                 );
 
-                spi_flash_disable_interrupts_caches_and_other_cpu();
                 // Make sure that all existing ram is written
                 writeback_caches(r->vaddr_start, r->size - to_decrement);
                 // Unmap the whole region
@@ -471,7 +480,6 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
                 r->size -= to_decrement;
                 why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
                 invalidate_caches(r->vaddr_start, r->size);
-                spi_flash_enable_interrupts_caches_and_other_cpu();
 
                 page_deallocate(r->paddr_start + to_decrement);
                 to_decrement = 0;
@@ -479,6 +487,7 @@ void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
         }
         task_info->heap_size -= decrement_amount;
         task_info->heap_end  -= decrement_amount;
+        spi_flash_enable_interrupts_caches_and_other_cpu();
     }
 
 out:
@@ -512,7 +521,41 @@ uintptr_t page_allocate(size_t size) {
     return 0;
 }
 
-// Cribbed from ESP-IDF 5.4.2
+#define BAD_PAGES_MAX 10
+static uintptr_t bad_pages[BAD_PAGES_MAX];
+static int       bad_pages_num = 0;
+
+void reserve_bad_pages(size_t psram_size) {
+    size_t     total_pages = buddy_get_free_pages(&page_allocator);
+    uintptr_t *pages       = calloc(1, total_pages * sizeof(uintptr_t));
+    if (!pages) {
+        ESP_LOGE("memory_init", "Couldn't allocate memory for free page pointers");
+        return;
+    }
+    // Allocate all free pages
+    for (int i = 0; i < total_pages - 1; ++i) {
+        pages[i] = page_allocate(SOC_MMU_PAGE_SIZE);
+    }
+
+    for (int i = 0; i < total_pages - 1; ++i) {
+        bool found = false;
+
+        for (int k = 0; k < bad_pages_num; ++k) {
+            if (bad_pages[k] == i * SOC_MMU_PAGE_SIZE) {
+                found = true;
+                break;
+            }
+        }
+
+        if (found) {
+            ESP_LOGW("memory_init", "Reserving bad page 0x%08X", i * SOC_MMU_PAGE_SIZE);
+        } else {
+            page_deallocate(pages[i]);
+        }
+    }
+    free(pages);
+}
+
 static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
     int volatile *spiram = (int volatile *)v_start;
     size_t        p;
@@ -526,12 +569,37 @@ static IRAM_ATTR bool test_psram(intptr_t v_start, size_t size) {
 
     ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Writing back pages");
     writeback_caches(v_start, size);
-    ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Invalidate pages");
+    ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Invalidating pages");
     invalidate_caches(v_start, size);
 
     ESP_DRAM_LOGW(DRAM_STR("memory_test"), "Starting read");
     for (p = 0; p < (size / sizeof(int)); p += 8) {
         if (spiram[p] != (p ^ 0xAAAAAAAA)) {
+            uintptr_t address = VADDR_START + (p * 4);
+            uintptr_t page    = ((address - VADDR_START) & ~(SOC_MMU_PAGE_SIZE - 1));
+            bool      found   = false;
+
+            for (int k = 0; k < 8; ++k) {
+                if (bad_pages[k] == page) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                if (bad_pages_num == BAD_PAGES_MAX) {
+                    ESP_DRAM_LOGE(DRAM_STR("memory_test"), "Too many bad pages");
+                    esp_system_abort("Too many bad pages in memory test");
+                }
+                ESP_DRAM_LOGE(
+                    DRAM_STR("memory_test"),
+                    "Addres 0x%08lx page 0x%08lx failed, expected 0x%08lx, got 0x%08lx",
+                    address,
+                    page,
+                    p ^ 0xAAAAAAAA,
+                    spiram[p]
+                );
+                bad_pages[bad_pages_num++] = page;
+            }
             errct++;
             if (errct == 1) {
                 initial_err = p * 4;
@@ -593,8 +661,7 @@ void IRAM_ATTR memory_init() {
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Running memory test");
     if (!test_psram(VADDR_START, out_len)) {
-        spi_flash_enable_interrupts_caches_and_other_cpu();
-        esp_restart();
+        ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Found bad pages");
     }
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Unmapping all of our address space");
@@ -611,6 +678,10 @@ void IRAM_ATTR memory_init() {
 
     ESP_DRAM_LOGW(DRAM_STR("memory_init"), "Initialzing memory pool");
     init_pool(&page_allocator, (void *)VADDR_START, (void *)VADDR_START + psram_size, 0);
+
+    if (bad_pages_num) {
+        reserve_bad_pages(psram_size);
+    }
 
     uintptr_t framebuffer_page = page_allocate(SOC_MMU_PAGE_SIZE);
 
@@ -641,7 +712,6 @@ void IRAM_ATTR memory_init() {
         0
     );
 
-    cache_lock = xSemaphoreCreateMutex();
     init_memory_heap_caps();
     print_allocator(&page_allocator);
 }
