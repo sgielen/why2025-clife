@@ -37,6 +37,8 @@ int main(int argc, char *argv[]) {
                         t = ptrs[(i - 50) % 100][k];
 
                         if (t != task_id) {
+                            uintptr_t vaddr = (uintptr_t)(&ptrs[(i - 50) % 100][k]);
+                            // uintptr_t vaddr_aligned = ((uintptr_t)vaddr) & ~(65535 - 1);
                             printf(
                                 "\033[0;31mError unexpected memory contents! expected 0x%X got 0x%X (%c) in ptr number "
                                 "%i, vaddr %p, paddr 0x%08lx\033[0m\n",
@@ -45,8 +47,16 @@ int main(int argc, char *argv[]) {
                                 t,
                                 (i - 50) % 100,
                                 &ptrs[(i - 50) % 100][k],
-                                vaddr_to_paddr((uintptr_t)(&ptrs[(i - 50) % 100][k]))
+                                vaddr_to_paddr(vaddr)
                             );
+
+                            for (int l = 0; l < 40; ++l) {
+                                printf("0x%08X: ", vaddr + (l * 40));
+                                for (int p = 0; p < 40; ++p) {
+                                    printf("%02x ", ((char*)(vaddr))[(l * 40) + p]);
+                                }
+                                printf("\n");
+                            }
                             die("Unexpected memory contents in memory bench");
                             return 1;
                         }
