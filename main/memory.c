@@ -60,7 +60,6 @@ extern void spi_flash_restore_cache(uint32_t cpuid, uint32_t saved_state);
 extern void spi_flash_disable_cache(uint32_t cpuid, uint32_t saved_state);
 
 extern void        init_memory_heap_caps();
-extern esp_err_t __real_esp_cache_msync(void *addr, size_t size, int flags);
 static char const *TAG = "memory";
 
 IRAM_ATTR void dump_mmu() {
@@ -79,80 +78,6 @@ IRAM_ATTR void dump_mmu() {
         }
     }
     esp_rom_printf("*********** MMU DUMP END   ***********\n");
-}
-
-/**
- * @brief Invalidate L1 ICache all
- *
- * @param cache_id     id of the cache in this type and level
- */
-__attribute__((always_inline))
-static inline void cache_ll_l1_invalidate_icache_all(uint32_t cache_id)
-{
-    if (cache_id == 0) {
-        Cache_Invalidate_All(CACHE_MAP_L1_ICACHE_0);
-    } else if (cache_id == 1) {
-        Cache_Invalidate_All(CACHE_MAP_L1_ICACHE_1);
-    } else if (cache_id == CACHE_LL_ID_ALL) {
-        Cache_Invalidate_All(CACHE_MAP_L1_ICACHE_MASK);
-    }
-}
-
-/**
- * @brief Invalidate L1 DCache all
- *
- * @param cache_id     id of the cache in this type and level
- */
-__attribute__((always_inline))
-static inline void cache_ll_l1_invalidate_dcache_all(uint32_t cache_id)
-{
-    if (cache_id == 0 || cache_id == CACHE_LL_ID_ALL) {
-        Cache_Invalidate_All(CACHE_MAP_L1_DCACHE);
-    }
-}
-
-/**
- * @brief Invalidate L2 Cache all
- *
- * @param cache_id     id of the cache in this type and level
- */
-__attribute__((always_inline))
-static inline void cache_ll_l2_invalidate_cache_all(uint32_t cache_id)
-{
-    if (cache_id == 0 || cache_id == CACHE_LL_ID_ALL) {
-        Cache_Invalidate_All(CACHE_MAP_L2_CACHE);
-    }
-}
-
-/**
- * @brief Invalidate all
- *
- * @param cache_level       level of the cache
- * @param type              see `cache_type_t`
- * @param cache_id          id of the cache in this type and level
- */
-__attribute__((always_inline))
-static inline void cache_ll_invalidate_all(uint32_t cache_level, cache_type_t type, uint32_t cache_id)
-{
-    if (cache_level == 1 || cache_level == 2 || cache_level == CACHE_LL_LEVEL_ALL) {
-        switch (type) {
-        case CACHE_TYPE_INSTRUCTION:
-            cache_ll_l1_invalidate_icache_all(cache_id);
-            break;
-        case CACHE_TYPE_DATA:
-            cache_ll_l1_invalidate_dcache_all(cache_id);
-            break;
-        case CACHE_TYPE_ALL:
-        default:
-            cache_ll_l1_invalidate_icache_all(cache_id);
-            cache_ll_l1_invalidate_dcache_all(cache_id);
-            break;
-        }
-    }
-
-    if (cache_level == 2 || cache_level == CACHE_LL_LEVEL_ALL) {
-        cache_ll_l2_invalidate_cache_all(cache_id);
-    }
 }
 
 // Copied from ESP-IDF 5.4.2 for speed
@@ -210,29 +135,33 @@ __attribute__((always_inline)) static inline void
 }
 
 __attribute__((always_inline)) static inline void invalidate_caches(uintptr_t vaddr_start, uint32_t len) {
-    //cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
-    //cache_ll_l1_invalidate_dcache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
-    //cache_ll_l2_invalidate_cache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
-
-    //cache_ll_invalidate_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_ALL, 0);
-    //cache_ll_invalidate_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_ALL, 1);
-    //cache_ll_writeback_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, 1);
-    //cache_ll_invalidate_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_ALL, 1);
-    __real_esp_cache_msync((void*)vaddr_start, len, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
-    __real_esp_cache_msync((void*)vaddr_start, len, ESP_CACHE_MSYNC_FLAG_DIR_M2C | ESP_CACHE_MSYNC_FLAG_TYPE_INST);
+    cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    cache_ll_l1_invalidate_dcache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
+    cache_ll_l2_invalidate_cache_addr(CACHE_LL_ID_ALL, vaddr_start, len);
 }
 
 __attribute__((always_inline)) static inline void writeback_caches(uintptr_t vaddr_start, uint32_t len) {
-    //cache_ll_writeback_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, 1);
-    //cache_ll_invalidate_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_ALL, 1);
     // cache_ll_writeback_all(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL);
-    // cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
-    __real_esp_cache_msync((void*)vaddr_start, len, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
+    cache_ll_writeback_addr(CACHE_LL_LEVEL_ALL, CACHE_TYPE_DATA, CACHE_LL_ID_ALL, vaddr_start, len);
 }
 
 IRAM_ATTR esp_err_t __wrap_esp_cache_msync(void *addr, size_t size, int flags) {
     spi_flash_disable_interrupts_caches_and_other_cpu();
-    __real_esp_cache_msync(addr, size, flags);
+    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_C2M) {
+        writeback_caches((uintptr_t)addr, size);
+        spi_flash_enable_interrupts_caches_and_other_cpu();
+        return 0;
+    }
+
+    if (flags & ESP_CACHE_MSYNC_FLAG_DIR_M2C) {
+        invalidate_caches((uintptr_t)addr, size);
+        spi_flash_enable_interrupts_caches_and_other_cpu();
+        return 0;
+    }
+
+    writeback_caches((uintptr_t)addr, size);
+    invalidate_caches((uintptr_t)addr, size);
+
     spi_flash_enable_interrupts_caches_and_other_cpu();
     return 0;
 }
@@ -275,11 +204,15 @@ __attribute__((always_inline)) static inline void
         spi_flash_disable_interrupts_caches_and_other_cpu();
         why_mmu_hal_map_region(mmu_id, MMU_TARGET_PSRAM0, r->vaddr_start, r->paddr_start, r->size);
         // Give other tasks a chance
-        invalidate_caches(r->vaddr_start, r->size);
         spi_flash_enable_interrupts_caches_and_other_cpu();
         total_size += r->size;
         r           = r->next;
     }
+
+    // Invalidate all caches at once
+    spi_flash_disable_interrupts_caches_and_other_cpu();
+    invalidate_caches(start, total_size);
+    spi_flash_enable_interrupts_caches_and_other_cpu();
 }
 
 static task_info_t *current_mapped_task = NULL;
@@ -304,7 +237,6 @@ void IRAM_ATTR remap_task(task_info_t *task_info) {
         // ESP_DRAM_LOGW(DRAM_STR("remap_task"), "Unmapping vaddr 0x%08X, paddr 0x%08X", SOC_EXTRAM_LOW + (i *
         // SOC_MMU_PAGE_SIZE), (entry & ~0xC00) << 16);
         writeback_caches(SOC_EXTRAM_LOW + (i * SOC_MMU_PAGE_SIZE), SOC_MMU_PAGE_SIZE);
-        invalidate_caches(SOC_EXTRAM_LOW + (i * SOC_MMU_PAGE_SIZE), SOC_MMU_PAGE_SIZE);
         mmu_ll_set_entry_invalid(mmu_id, i);
     }
 
@@ -316,7 +248,7 @@ void IRAM_ATTR remap_task(task_info_t *task_info) {
     }
 
     // Invalidate all caches at once
-    // invalidate_caches(task_info->heap_start, task_info->heap_size);
+    invalidate_caches(task_info->heap_start, task_info->heap_size);
     current_mapped_task = task_info;
 }
 
