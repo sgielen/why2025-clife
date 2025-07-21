@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
     gettimeofday(&start, NULL);
     char task_id = (char)getpid();
 
-    char *ptrs[100];
+    char *ptrs[100] = {0};
 
     for (int i = 0; i < NUM_ITERATIONS; i++) {
         // Allocate some memory
