@@ -17,6 +17,7 @@
 #include "compositor.h"
 
 #include "device.h"
+#include "drivers/keyboard.h"
 #include "driver/ppa.h"
 #include "esp_cache.h"
 #include "esp_log.h"
@@ -46,6 +47,7 @@ typedef struct managed_framebuffer {
 
 static TaskHandle_t  compositor_handle;
 static lcd_device_t *lcd_device;
+static device_t     *keyboard_device;
 
 static managed_framebuffer_t *window_stack      = NULL;
 static SemaphoreHandle_t      window_stack_lock = NULL;
@@ -535,6 +537,9 @@ IRAM_ATTR static void draw_window_box(managed_framebuffer_t *framebuffer) {
 
 IRAM_ATTR static void on_refresh(void *ignored) {
     xSemaphoreGive(vsync);
+
+    //if (compositor_initialized) {
+    //}
 }
 
 IRAM_ATTR static bool
@@ -563,18 +568,30 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
 
     while (1) {
         xSemaphoreTake(vsync, portMAX_DELAY);
-        lcd_device->_draw(lcd_device, 0, 0, FRAMEBUFFER_MAX_W, FRAMEBUFFER_MAX_H, framebuffers[cur_fb]);
-        cur_fb = (cur_fb + 1) % 3;
+
+        keyboard_event_ll_t c;
+        // ssize_t res = keyboard_device->_read(keyboard_device, 0, &c, sizeof(keyboard_event_ll_t));
+        // if (res > 0) {
+        //    ESP_LOGE(TAG, "Got keyboard scancode 0x%08x, down: %i", c.scancode, c.down);
+        // }
 
         if (xSemaphoreTake(window_stack_lock, portMAX_DELAY) != pdTRUE) {
             ESP_LOGE(TAG, "Failed to get window list mutex");
             abort();
         }
 
+        bool changes = false;
+
         if (window_stack) {
             managed_framebuffer_t *framebuffer = window_stack->prev; // Start with back window
 
             do {
+                if (atomic_flag_test_and_set(&framebuffer->clean)) {
+                    goto next;
+                }
+
+                changes = true;
+
                 int content_x = framebuffer->x + BORDER_PX;
                 int content_y = framebuffer->y + BORDER_TOP_PX;
 
@@ -625,19 +642,34 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                 esp_cache_msync(framebuffers[cur_fb], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
 
                 xSemaphoreGive(framebuffer->ready);
+next:
                 framebuffer = framebuffer->prev;
             } while (framebuffer != window_stack->prev);
         }
+
         xSemaphoreGive(window_stack_lock);
+
+        if (changes) {
+            lcd_device->_draw(lcd_device, 0, 0, FRAMEBUFFER_MAX_W, FRAMEBUFFER_MAX_H, framebuffers[cur_fb]);
+            cur_fb = (cur_fb + 1) % 3;
+        }
+
     }
 }
 
-void compositor_init(char const *device) {
+void compositor_init(char const *lcd_device_name, char const *keyboard_device_name) {
     ESP_LOGI(TAG, "Initializing");
-    lcd_device = (lcd_device_t *)device_get(device);
+
+    lcd_device = (lcd_device_t *)device_get(lcd_device_name);
     if (!lcd_device) {
-        ESP_LOGE(TAG, "Unable to access the LCD device");
+        ESP_LOGE(TAG, "Unable to access the LCD device '%s'", lcd_device_name);
         return;
+    }
+
+    keyboard_device = (device_t *)device_get(keyboard_device_name);
+    if (!keyboard_device) {
+        ESP_LOGE(TAG, "Unable to access the keyboard device '%s'", keyboard_device_name);
+        // return;
     }
 
     lcd_device->_getfb(lcd_device, 0, (void *)&framebuffers[0]);
@@ -653,7 +685,7 @@ void compositor_init(char const *device) {
 
     cur_fb = 1;
 
-    ESP_LOGW(TAG, "Got framebuffers 0: %p, 1: %p", framebuffers[0], framebuffers[1]);
+    ESP_LOGW(TAG, "Got framebuffers 0: %p, 1: %p, 2: %p", framebuffers[0], framebuffers[1], framebuffers[2]);
     lcd_device->_set_refresh_cb(lcd_device, NULL, on_refresh);
 
     window_stack_lock = xSemaphoreCreateMutex();

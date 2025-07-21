@@ -16,12 +16,7 @@
 
 #pragma once
 
-#include "framebuffer.h"
-
-#include <stdbool.h>
-
-framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h);
-void           framebuffer_free(framebuffer_t *framebuffer);
-void           framebuffer_post(framebuffer_t *framebuffer, bool block);
-
-void compositor_init(char const *lcd_device, char const *keyboard_device);
+typedef enum event_type {
+    EVENT_KEY_DOWN,
+    EVENT_KEY_UP,
+} event_type_t;

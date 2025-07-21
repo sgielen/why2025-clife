@@ -24,8 +24,8 @@
 #include "device.h"
 #include "drivers/fatfs.h"
 #include "drivers/st7703.h"
+#include "drivers/tca8418.h"
 #include "drivers/tty.h"
-// #include "drivers/tca8418.h"
 #include "elf_symbols.h"
 #include "esp_debug_helpers.h"
 #include "esp_log.h"
@@ -109,8 +109,7 @@ int app_main(void) {
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
     logical_name_set("SEARCH", "FLASH0:[SUBDIR], FLASH0:[SUBDIR.ANOTHER]", false);
 
-    // compositor_init("PANEL0", "KEYBOARD0");
-    compositor_init("PANEL0");
+    compositor_init("PANEL0", "KEYBOARD0");
 
     printf("BadgeVMS is ready\n");
     free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
@@ -191,7 +190,7 @@ int app_main(void) {
 
     pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
-    pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    // pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
 #if 0

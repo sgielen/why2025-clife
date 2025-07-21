@@ -64,6 +64,8 @@ menu "LDO Regulator Configurations"
             bool "1.95V"
         config ESP_LDO_VOLTAGE_PSRAM_2000_MV
             bool "2.0V"
+        config ESP_LDO_VOLTAGE_PSRAM_2200_MV
+            bool "2.2V"
     endchoice
 
     config ESP_LDO_VOLTAGE_PSRAM_DOMAIN
@@ -72,4 +74,5 @@ menu "LDO Regulator Configurations"
         default 1900 if ESP_LDO_VOLTAGE_PSRAM_1900_MV
         default 1950 if ESP_LDO_VOLTAGE_PSRAM_1950_MV
         default 2000 if ESP_LDO_VOLTAGE_PSRAM_2000_MV
+        default 2200 if ESP_LDO_VOLTAGE_PSRAM_2200_MV
 endmenu
