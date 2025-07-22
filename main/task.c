@@ -477,12 +477,10 @@ static void IRAM_ATTR zeus(void *ignored) {
                 1
             );
             if (res == pdPASS) {
-                vTaskSuspend(new_task);
                 // Since Zeus is the highest priority task on the core the task should never be able to run
                 task_info->handle = new_task;
                 process_table_add_task(task_info);
                 vTaskSetThreadLocalStoragePointer(new_task, 0, task_info);
-                vTaskResume(new_task);
                 ESP_LOGV("ZEUS", "PID %d sprung forth fully formed from my forehead", task_info->pid);
                 ++num_tasks;
             } else {
@@ -524,11 +522,11 @@ void task_init() {
     hades_queue = xQueueCreate(16, sizeof(pid_t));
     // Hades has higher priority than Zeus. This prevents dead tasks from piling up
     // while Zeus tries to spawn new ones
-    xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 11, &hades_handle, 0);
+    xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 11, &hades_handle, 1);
     vTaskSetThreadLocalStoragePointer(hades_handle, 0, &kernel_task);
 
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Starting Zeus process");
     zeus_queue = xQueueCreate(16, sizeof(task_info_t *));
-    xTaskCreatePinnedToCore(zeus, "Zeus", 2048, NULL, 10, &zeus_handle, 0);
+    xTaskCreatePinnedToCore(zeus, "Zeus", 2048, NULL, 10, &zeus_handle, 1);
     vTaskSetThreadLocalStoragePointer(zeus_handle, 0, &kernel_task);
 }
