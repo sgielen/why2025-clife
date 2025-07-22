@@ -35,8 +35,7 @@
 #include <regex.h>
 #include <string.h>
 
-extern void spi_flash_enable_interrupts_caches_and_other_cpu(void);
-extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
+extern void writeback_and_invalidate_task(task_info_t *task_info);
 extern void remap_task(task_info_t *task_info);
 extern void unmap_task(task_info_t *task_info);
 extern void __real_xt_unhandled_exception(void *frame);
@@ -293,7 +292,7 @@ static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
 static void elf_task(task_info_t *task_info) {
     int ret;
 
-    esp_elf_t *elf = malloc(sizeof(esp_elf_t));
+    esp_elf_t *elf = calloc(1, sizeof(esp_elf_t));
     if (!elf) {
         ESP_LOGE(TAG, "Out of memory trying to allocate elf structure");
         return;
@@ -320,8 +319,10 @@ static void elf_task(task_info_t *task_info) {
         free(task_info->buffer);
     }
 
-    ESP_LOGI(TAG, "Start ELF file entrypoint");
+    ESP_LOGI(TAG, "Writing back and invalidating our address space");
+    writeback_and_invalidate_task(task_info);
 
+    ESP_LOGI(TAG, "Start ELF file entrypoint");
     esp_elf_request(elf, 0, task_info->argc, task_info->argv);
 
     ESP_LOGI(TAG, "Successfully exited from ELF file");
