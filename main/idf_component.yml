@@ -1,15 +1,13 @@
 dependencies:
-  esp_lcd_st7703:
-    override_path: ../components/esp_lcd_st7703
   elf_loader:
     version: 1.*
     override_path: ../components/elf_loader
   esp_lcd:
     override_path: ../components/esp_lcd
+  esp_lcd_st7703:
+    override_path: ../components/esp_lcd_st7703
   esp_psram:
     override_path: ../components/esp_psram
-  esp_hw_support:
-    override_path: ../components/esp_hw_support
   freertos:
     override_path: ../components/freertos
   why_stdio:

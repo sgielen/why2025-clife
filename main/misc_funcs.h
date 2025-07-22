@@ -18,5 +18,5 @@
 
 #include <stdint.h>
 
-void die(char const *reason);
+void     die(char const *reason);
 uint32_t vaddr_to_paddr(uint32_t vaddr);

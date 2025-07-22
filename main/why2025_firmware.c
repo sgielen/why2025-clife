@@ -14,6 +14,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "esp_idf_version.h"
+
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 5, 0)
+#error "BadgeVMS requires esp-idf 5.50 (or maybe later, who knows)
+#endif
 
 #include "compositor.h"
 #include "device.h"
