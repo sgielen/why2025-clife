@@ -50,11 +50,7 @@ IRAM_ATTR static task_info_t       kernel_task = {
           .psram      = &kernel_task_psram,
 };
 
-// Tracks free PIDs. Note that free PIDs are marked as 1, not 0!
-static uint32_t          pid_free_bitmap[NUM_PIDS / 32];
-static SemaphoreHandle_t pid_free_bitmap_lock = NULL;
-static pid_t             next_pid;
-static uint32_t          num_tasks = 0;
+static uint32_t num_tasks = 0;
 
 // Process table, each process gets a PID, which we track here.
 static task_info_t      *process_table[NUM_PIDS];
@@ -63,77 +59,43 @@ static SemaphoreHandle_t process_table_lock = NULL;
 static TaskHandle_t  hades_handle;
 static QueueHandle_t hades_queue;
 
+static SemaphoreHandle_t pid_table_lock = NULL;
+static pid_t             pid_table[NUM_PIDS];
+static uint32_t          head = 0;
+static uint32_t          tail = MAX_PID;
+
 static pid_t pid_allocate() {
-    if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
+    if (xSemaphoreTake(pid_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get pid table mutex");
         abort();
     }
 
-    // First see if our next pid is free
-    pid_t    pid      = next_pid;
-    uint32_t word_idx = pid / 32;
-    uint32_t bit_idx  = pid % 32;
-
-    if (bitcheck(pid_free_bitmap[word_idx], bit_idx)) {
-        // next_pid is free. claim it.
-        bitclear(pid_free_bitmap[word_idx], bit_idx);
+    pid_t pid = pid_table[head];
+    if (pid == -1) {
         goto out;
     }
-
-    // No, we will need to scan our bitmap
-    for (int i = 0; i < (sizeof(pid_free_bitmap) / 4); ++i) {
-        // We want to loop through all of our bitmap, but we want to start at
-        // where we expect the next free pid to be
-        int check_word_idx = (i + word_idx) % (sizeof(pid_free_bitmap) / 4);
-
-        if (!pid_free_bitmap[check_word_idx]) {
-            // all zeros no need to check
-            continue;
-        }
-
-        for (int k = 0; k < 32; ++k) {
-            if (bitcheck(pid_free_bitmap[check_word_idx], k)) {
-                bitclear(pid_free_bitmap[check_word_idx], k);
-                pid = check_word_idx * 32 + k;
-                goto out;
-            }
-        }
-    }
-
-    // No free pids
-    pid = -1;
-    goto error;
+    pid_table[head] = -1;
+    head            = (head + 1) % NUM_PIDS;
 
 out:
-    next_pid = pid + 1;
+    xSemaphoreGive(pid_table_lock);
+    return pid;
+}
 
-    if (next_pid > MAX_PID) {
-        // PIDs looped, start over
-        next_pid = 1;
+static void pid_free(pid_t pid) {
+    if (xSemaphoreTake(pid_table_lock, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to get pid table mutex");
+        abort();
     }
 
-error:
+    pid_table[tail] = pid;
+    tail            = (tail + 1) % NUM_PIDS;
 
-    xSemaphoreGive(pid_free_bitmap_lock);
-    return pid;
+    xSemaphoreGive(pid_table_lock);
 }
 
 task_info_t *get_taskinfo_for_pid(pid_t pid) {
     return process_table[pid];
-}
-
-static void pid_free(pid_t pid) {
-    uint32_t word_idx = pid / 32;
-    uint32_t bit_idx  = pid % 32;
-
-    if (xSemaphoreTake(pid_free_bitmap_lock, portMAX_DELAY) != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to get pid table mutex");
-        abort();
-    }
-
-    bitset(pid_free_bitmap[word_idx], bit_idx);
-
-    xSemaphoreGive(pid_free_bitmap_lock);
 }
 
 static void process_table_add_task(task_info_t *task_info) {
@@ -479,10 +441,14 @@ void task_init() {
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Initializing");
 
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Creating PID table");
-    pid_free_bitmap_lock = xSemaphoreCreateMutex();
-    memset(pid_free_bitmap, 0xFF, sizeof(pid_free_bitmap));
+    pid_table_lock = xSemaphoreCreateMutex();
 
-    pid_free_bitmap[0] = UINT32_MAX - 1; // PID 0 is the kernel
+    for (int i = 0; i < NUM_PIDS; ++i) {
+        pid_table[i] = i;
+    }
+
+    // Reserve pid 0
+    pid_allocate();
 
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Creating Process table");
     process_table_lock = xSemaphoreCreateMutex();
@@ -501,6 +467,4 @@ void task_init() {
     hades_queue = xQueueCreate(16, sizeof(pid_t));
     xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 10, &hades_handle, 0);
     vTaskSetThreadLocalStoragePointer(hades_handle, 0, &kernel_task);
-
-    next_pid = 1;
 }
