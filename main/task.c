@@ -51,12 +51,14 @@ IRAM_ATTR static task_info_t       kernel_task = {
 
 static uint32_t num_tasks = 0;
 
-// Process table, each process gets a PID, which we track here.
 static task_info_t      *process_table[NUM_PIDS];
 static SemaphoreHandle_t process_table_lock = NULL;
 
 static TaskHandle_t  hades_handle;
 static QueueHandle_t hades_queue;
+
+static TaskHandle_t  zeus_handle;
+static QueueHandle_t zeus_queue;
 
 static SemaphoreHandle_t pid_table_lock = NULL;
 static pid_t             pid_table[NUM_PIDS];
@@ -127,7 +129,7 @@ void vTaskPreDeletionHook(TaskHandle_t handle) {
     task_info_t *task_info = pvTaskGetThreadLocalStoragePointer(handle, 0);
 
     if (!task_info) {
-        ESP_DRAM_LOGV(DRAM_STR("vTaskPreDeletionHook"), "Called for a kernel task");
+        ESP_DRAM_LOGW(DRAM_STR("vTaskPreDeletionHook"), "Called for a kernel task");
         return;
     }
 
@@ -256,39 +258,6 @@ void IRAM_ATTR __wrap_xt_unhandled_exception(void *frame) {
     __real_xt_unhandled_exception(frame);
 }
 
-static void IRAM_ATTR NOINLINE_ATTR hades(void *ignored) {
-    pid_t dead_pid;
-
-    while (1) {
-        // Block until a task dies
-        if (xQueueReceive(hades_queue, &dead_pid, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI("HADES", "Stripping PID %d of its worldy possessions", dead_pid);
-
-            task_info_t *task_info = process_table[dead_pid];
-            if (task_info) {
-                switch (task_info->type) {
-                    case TASK_TYPE_ELF:
-                    case TASK_TYPE_ELF_ROM: free(task_info->data); break;
-                    default: ESP_LOGE(TAG, "Unknown task type %i", task_info->type);
-                }
-
-                process_table_remove_task(task_info);
-                if (task_info->heap_size) {
-                    pages_deallocate(task_info->allocations);
-                }
-                task_info_delete(task_info);
-
-                // Don't free our PID until the last moment
-                pid_free(dead_pid);
-                ESP_LOGI("HADES", "Task %d escorted to my realm", dead_pid);
-                --num_tasks;
-            } else {
-                ESP_LOGE("HADES", "Task %d has no task info?", dead_pid);
-            }
-        }
-    }
-}
-
 static void elf_task(task_info_t *task_info) {
     int ret;
 
@@ -363,7 +332,7 @@ void task_record_resource_free(task_resource_type_t type, void *ptr) {
     khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
 }
 
-pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *argv[]) {
+pid_t run_task(void *buffer, uint16_t stack_size, task_type_t type, int argc, char *argv[]) {
     pid_t pid = pid_allocate();
     if (pid <= 0) {
         ESP_LOGW(TAG, "Cannot allocate PID for new task");
@@ -387,6 +356,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
     task_info->buffer        = buffer;
     task_info->buffer_in_rom = false;
     task_info->argc          = argc;
+    task_info->stack_size    = stack_size;
 
     // Pack up argv in a nice compact list
     size_t argv_size = argc * sizeof(char *);
@@ -421,27 +391,8 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
         default: ESP_LOGE(TAG, "Unknown task type %i", type); goto error;
     }
 
-#if (NUM_PIDS > 999)
-#error "If you hit this assertion change the allocation for the task name to match the new size"
-#endif
-
-    // "Task " + "255" + \0
-    char task_name[5 + 3 + 1];
-    sprintf(task_name, "Task %i", (uint8_t)pid);
-
-    // xTaskCreate(generic_task, task_name, stack_size, (void *)task_info, 5, NULL);
-    ++num_tasks;
-    TaskHandle_t new_task;
-    xTaskCreatePinnedToCore(generic_task, task_name, stack_size, (void *)task_info, 5, &new_task, 1);
-    if (new_task) {
-        vTaskSuspend(new_task);
-        task_info->handle = new_task;
-        process_table_add_task(task_info);
-        vTaskSetThreadLocalStoragePointer(new_task, 0, task_info);
-        vTaskResume(new_task);
-        return pid;
-    }
-
+    xQueueSend(zeus_queue, &task_info, portMAX_DELAY);
+    return pid;
 error:
     task_info_delete(task_info);
     pid_free(pid);
@@ -459,6 +410,77 @@ void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
 
 uint32_t get_num_tasks() {
     return num_tasks;
+}
+
+static void IRAM_ATTR hades(void *ignored) {
+    pid_t dead_pid;
+
+    while (1) {
+        // Block until a task dies
+        if (xQueueReceive(hades_queue, &dead_pid, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGI("HADES", "Stripping PID %d of its worldy possessions", dead_pid);
+
+            task_info_t *task_info = process_table[dead_pid];
+            if (task_info) {
+                switch (task_info->type) {
+                    case TASK_TYPE_ELF:
+                    case TASK_TYPE_ELF_ROM: free(task_info->data); break;
+                    default: ESP_LOGE(TAG, "Unknown task type %i", task_info->type);
+                }
+
+                process_table_remove_task(task_info);
+                if (task_info->heap_size) {
+                    pages_deallocate(task_info->allocations);
+                }
+                task_info_delete(task_info);
+
+                // Don't free our PID until the last moment
+                pid_free(dead_pid);
+                ESP_LOGI("HADES", "Task %d escorted to my realm", dead_pid);
+                --num_tasks;
+            } else {
+                ESP_LOGE("HADES", "Task %d has no task info?", dead_pid);
+            }
+        }
+    }
+}
+
+static void IRAM_ATTR zeus(void *ignored) {
+    task_info_t *task_info;
+#if (NUM_PIDS > 999)
+#error "If you hit this assertion change the allocation for the task name to match the new size"
+#endif
+    // "Task " + "255" + \0
+    char task_name[5 + 3 + 1];
+
+    while (1) {
+        // Block until a new tasks wants to be born
+        if (xQueueReceive(zeus_queue, &task_info, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGI("ZEUS", "Breathing life into PID %d", task_info->pid);
+            TaskHandle_t new_task;
+            BaseType_t   res = xTaskCreatePinnedToCore(
+                generic_task,
+                task_name,
+                task_info->stack_size,
+                (void *)task_info,
+                5,
+                &new_task,
+                1
+            );
+            if (res == pdPASS) {
+                // Since Zeus is the highest priority task on the core the task should never be able to run
+                task_info->handle = new_task;
+                process_table_add_task(task_info);
+                vTaskSetThreadLocalStoragePointer(new_task, 0, task_info);
+                ESP_LOGV("ZEUS", "PID %d sprung forth fully formed from my forehead", task_info->pid);
+                ++num_tasks;
+            } else {
+                ESP_LOGE("ZEUS", "PID %d could not be started, too good for this world", task_info->pid);
+                pid_free(task_info->pid);
+                task_info_delete(task_info);
+            }
+        }
+    }
 }
 
 void task_init() {
@@ -489,6 +511,13 @@ void task_init() {
 
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Starting Hades process");
     hades_queue = xQueueCreate(16, sizeof(pid_t));
-    xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 10, &hades_handle, 0);
+    // Hades has higher priority than Zeus. This prevents dead tasks from piling up
+    // while Zeus tries to spawn new ones
+    xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 11, &hades_handle, 0);
     vTaskSetThreadLocalStoragePointer(hades_handle, 0, &kernel_task);
+
+    ESP_DRAM_LOGI(DRAM_STR("task_init"), "Starting Zeus process");
+    zeus_queue = xQueueCreate(16, sizeof(task_info_t *));
+    xTaskCreatePinnedToCore(zeus, "Zeus", 2048, NULL, 10, &zeus_handle, 0);
+    vTaskSetThreadLocalStoragePointer(zeus_handle, 0, &kernel_task);
 }
