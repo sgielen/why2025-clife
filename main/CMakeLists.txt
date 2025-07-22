@@ -105,8 +105,9 @@ add_custom_target(generated_symbols
 add_dependencies(${COMPONENT_LIB} generated_symbols)
 target_link_libraries(${COMPONENT_LIB} PRIVATE m g 
 	-Wl,--wrap=esp_panic_handler
-	-Wl,--wrap=esp_cache_msync
 	-Wl,--wrap=xt_unhandled_exception
+
+	# heap_caps
 	-Wl,--wrap=heap_caps_malloc_base
 	-Wl,--wrap=heap_caps_realloc_base
 	-Wl,--wrap=heap_caps_calloc_base
