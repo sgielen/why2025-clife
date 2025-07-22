@@ -272,7 +272,7 @@ IRAM_ATTR void remap_task(task_info_t *task_info) {
 }
 
 void IRAM_ATTR unmap_task(task_info_t *task_info) {
-    if (current_mapped_task && current_mapped_task != task_info->pid) {
+    if (current_mapped_task != task_info->pid) {
         ESP_DRAM_LOGE(
             DRAM_STR("unmap_task"),
             "Expected task %u but actual current task is %u",
