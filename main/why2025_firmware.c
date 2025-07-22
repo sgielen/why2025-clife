@@ -212,7 +212,7 @@ int app_main(void) {
             // vTaskDelay(500 / portTICK_PERIOD_MS);
         }
         free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-        ESP_LOGW(TAG, "Free main memory: %zi", free_ram);
+        ESP_LOGW(TAG, "Free main memory: %zi, running processes %u", free_ram, get_num_tasks());
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     // pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);

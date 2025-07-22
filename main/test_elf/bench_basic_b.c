@@ -1,4 +1,6 @@
 #include "misc_funcs.h"
+
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -6,10 +8,15 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#define NUM_ITERATIONS 10000
-#define ALLOC_SIZE     4096
+#define NUM_ITERATIONS 100
+#define ALLOC_SIZE     4096 * 10
 
-int volatile should_exit = 0;
+static inline bool is_single_bit_flip(char a, char b) {
+    char diff = a ^ b;
+
+    // Check if diff is a power of 2 (exactly one bit set)
+    return (diff & (diff - 1)) == 0;
+}
 
 int main(int argc, char *argv[]) {
     struct timeval start, end;
@@ -37,30 +44,48 @@ int main(int argc, char *argv[]) {
                         t = ptrs[(i - 50) % 100][k];
 
                         if (t != task_id) {
-                            uintptr_t vaddr = (uintptr_t)(&ptrs[(i - 50) % 100][k]);
-                            // uintptr_t vaddr_aligned = ((uintptr_t)vaddr) & ~(65535 - 1);
-                            printf(
-                                "\033[0;31mError unexpected memory contents! expected 0x%X got 0x%X (%c) in ptr number "
-                                "%i, vaddr %p, paddr 0x%08lx\033[0m\n",
-                                task_id,
-                                t,
-                                t,
-                                (i - 50) % 100,
-                                &ptrs[(i - 50) % 100][k],
-                                vaddr_to_paddr(vaddr)
-                            );
+                            uintptr_t vaddr = (uintptr_t)(&ptrs[(i - 50) % 100][k > 20 ? k - 20 : 0]);
+                            if (is_single_bit_flip(t, task_id)) {
+                                printf(
+                                    "\033[0;31mSingle bit flip expected 0x%X (%i) got 0x%X (%i) in ptr number "
+                                    "%i, vaddr %p, paddr 0x%08lx\033[0m\n",
+                                    task_id,
+                                    task_id,
+                                    t,
+                                    t,
+                                    (i - 50) % 100,
+                                    &ptrs[(i - 50) % 100][k],
+                                    vaddr_to_paddr(vaddr)
+                                );
+                            } else {
+                                printf(
+                                    "\033[0;31mError unexpected memory contents! expected 0x%X (%i) got 0x%X (%i) in "
+                                    "ptr number "
+                                    "%i, vaddr %p, paddr 0x%08lx\033[0m\n",
+                                    task_id,
+                                    task_id,
+                                    t,
+                                    t,
+                                    (i - 50) % 100,
+                                    &ptrs[(i - 50) % 100][k],
+                                    vaddr_to_paddr(vaddr)
+                                );
 
-                            for (int l = 0; l < 40; ++l) {
-                                printf("0x%08X: ", vaddr + (l * 40));
-                                for (int p = 0; p < 40; ++p) {
-                                    printf("%02x ", ((char*)(vaddr))[(l * 40) + p]);
+                                for (int z = 0; z < 3; ++z) {
+                                    for (int l = 0; l < 1; ++l) {
+                                        printf("0x%08X: ", vaddr + (l * 40));
+                                        for (int p = 0; p < 40; ++p) {
+                                            printf("%02x ", ((char *)(vaddr))[(l * 40) + p]);
+                                        }
+                                        printf("\n");
+                                    }
+                                    usleep(10000);
                                 }
-                                printf("\n");
+                                die("Unexpected memory contents in memory bench");
+                                return 1;
                             }
-                            die("Unexpected memory contents in memory bench");
-                            return 1;
                         }
-                        ptrs[(i - 50) % 100][k] = '$';
+                        ptrs[(i - 50) % 100][k] = -task_id;
                     }
                     free(ptrs[(i - 50) % 100]);
                     ptrs[(i - 50) % 100] = NULL;
