@@ -120,13 +120,25 @@ static void process_table_remove_task(task_info_t *task_info) {
     xSemaphoreGive(process_table_lock);
 }
 
-static void task_killed(int idx, void *ti) {
-    task_info_t *task_info = ti;
+void vTaskPreDeletionHook(TaskHandle_t handle) {
+    task_info_t *task_info = pvTaskGetThreadLocalStoragePointer(handle, 0);
 
-    BaseType_t higher_priority_task_woken = pdFALSE;
-    pid_t      pid                        = task_info->pid;
-    xQueueSendFromISR(hades_queue, &pid, &higher_priority_task_woken);
-    portYIELD_FROM_ISR(higher_priority_task_woken);
+    if (!task_info) {
+        ESP_DRAM_LOGV(DRAM_STR("vTaskPreDeletionHook"), "Called for a kernel task");
+        return;
+    }
+
+    pid_t pid = task_info->pid;
+
+    if (xPortInIsrContext()) {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        if (xQueueSendFromISR(hades_queue, &pid, &xHigherPriorityTaskWoken) == errQUEUE_FULL) {
+            ESP_DRAM_LOGW(DRAM_STR("vTaskPreDeletionHook"), "Hades queue full, memory leak.");
+        }
+
+    } else {
+        xQueueSend(hades_queue, &pid, portMAX_DELAY);
+    }
 }
 
 static task_info_t *task_info_init() {
@@ -419,7 +431,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
     vTaskSuspend(new_task);
     task_info->handle = new_task;
     process_table_add_task(task_info);
-    vTaskSetThreadLocalStoragePointerAndDelCallback(new_task, 0, task_info, task_killed);
+    vTaskSetThreadLocalStoragePointer(new_task, 0, task_info);
     vTaskResume(new_task);
     return pid;
 }
