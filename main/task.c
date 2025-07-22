@@ -83,6 +83,10 @@ out:
 }
 
 static void pid_free(pid_t pid) {
+    if (pid < 0) {
+        return;
+    }
+
     if (xSemaphoreTake(pid_table_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get pid table mutex");
         abort();
@@ -171,6 +175,10 @@ static task_info_t *task_info_init() {
 }
 
 static void task_info_delete(task_info_t *task_info) {
+    if (!task_info) {
+        return;
+    }
+
     ESP_LOGI(TAG, "Deleting task_info %pi for pid %i", task_info, task_info->pid);
 
     for (int i = 0; i < MAXFD; ++i) {
@@ -365,7 +373,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
 
     task_info_t *task_info = task_info_init();
     if (!task_info) {
-        return -1;
+        goto error;
     }
 
     task_info->heap_start = (uintptr_t)VADDR_TASK_START;
@@ -388,8 +396,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
     task_info->argv = malloc(argv_size);
     if (!task_info->argv) {
         ESP_LOGE(TAG, "Out of memory trying to allocate argv buffer");
-        free(task_info);
-        return -1;
+        goto error;
     }
 
     // In case someone tries something clever
@@ -410,10 +417,7 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
             task_info->task_entry    = elf_task;
             task_info->buffer_in_rom = true;
             break;
-        default:
-            ESP_LOGE(TAG, "Unknown task type %i", type);
-            free(task_info);
-            return -1;
+        default: ESP_LOGE(TAG, "Unknown task type %i", type); goto error;
     }
 
 #if (NUM_PIDS > 999)
@@ -428,12 +432,19 @@ pid_t run_task(void *buffer, int stack_size, task_type_t type, int argc, char *a
     ++num_tasks;
     TaskHandle_t new_task;
     xTaskCreatePinnedToCore(generic_task, task_name, stack_size, (void *)task_info, 5, &new_task, 1);
-    vTaskSuspend(new_task);
-    task_info->handle = new_task;
-    process_table_add_task(task_info);
-    vTaskSetThreadLocalStoragePointer(new_task, 0, task_info);
-    vTaskResume(new_task);
-    return pid;
+    if (new_task) {
+        vTaskSuspend(new_task);
+        task_info->handle = new_task;
+        process_table_add_task(task_info);
+        vTaskSetThreadLocalStoragePointer(new_task, 0, task_info);
+        vTaskResume(new_task);
+        return pid;
+    }
+
+error:
+    task_info_delete(task_info);
+    pid_free(pid);
+    return -1;
 }
 
 void IRAM_ATTR task_switched_in_hook(TaskHandle_t volatile *handle) {
