@@ -173,6 +173,7 @@ __attribute__((always_inline)) static inline void
             esp_system_abort("Unexpected mmu state");
         }
         mmu_ll_write_entry(mmu_id, entry_id, mmu_val, mem_type);
+
         vaddr += page_size_in_bytes;
         mmu_val++;
         page_num--;
@@ -204,6 +205,7 @@ __attribute__((always_inline)) static inline void
             esp_system_abort("Unexpected mmu state");
         }
         mmu_ll_set_entry_invalid(mmu_id, entry_id);
+
         vaddr += page_size_in_bytes;
         page_num--;
     }
@@ -238,27 +240,18 @@ __attribute__((always_inline)) static inline void
     invalidate_caches(start, total_size);
 }
 
-
 IRAM_ATTR void remap_task(task_info_t *task_info) {
-    if (current_mapped_task == task_info->pid) {
-        return;
+    if (current_mapped_task) {
+        ESP_DRAM_LOGE(
+            DRAM_STR("map_task"),
+            "Expected task %u but actual current task is %u",
+            0,
+            current_mapped_task
+        );
+        esp_system_abort("Task info does not match");
     }
 
     uint32_t mmu_id   = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
-    uint32_t entry_id = mmu_ll_get_entry_id(mmu_id, VADDR_TASK_START);
-
-    // Unmap and write back whatever was in our address space
-    for (int i = entry_id; i < SOC_MMU_ENTRY_NUM; i++) {
-        uint32_t entry = mmu_ll_read_entry(mmu_id, i);
-        if (!entry) {
-            break;
-        }
-
-        // ESP_DRAM_LOGW(DRAM_STR("remap_task"), "Unmapping vaddr 0x%08X, paddr 0x%08X", SOC_EXTRAM_LOW + (i *
-        // SOC_MMU_PAGE_SIZE), (entry & ~0xC00) << 16);
-        writeback_caches(SOC_EXTRAM_LOW + (i * SOC_MMU_PAGE_SIZE), SOC_MMU_PAGE_SIZE);
-        mmu_ll_set_entry_invalid(mmu_id, i);
-    }
 
     allocation_range_t *r = task_info->allocations;
     while (r) {
@@ -298,8 +291,8 @@ void IRAM_ATTR unmap_task(task_info_t *task_info) {
         r = r->next;
     }
 
-    current_mapped_task = 0;
 out:
+    current_mapped_task = 0;
 }
 
 IRAM_ATTR void pages_deallocate(allocation_range_t *head_range) {
