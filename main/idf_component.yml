@@ -2,6 +2,8 @@ dependencies:
   elf_loader:
     version: 1.*
     override_path: ../components/elf_loader
+  esp_hw_support:
+    override_path: ../components/esp_hw_support
   esp_lcd:
     override_path: ../components/esp_lcd
   esp_lcd_st7703:
