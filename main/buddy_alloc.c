@@ -395,6 +395,18 @@ size_t buddy_get_free_pages(allocator_t *allocator) {
     return ret;
 }
 
+size_t buddy_get_total_pages(allocator_t *allocator) {
+    size_t ret = 0;
+
+    for (int p = 0; p < allocator->memory_pool_num; ++p) {
+        memory_pool_t *pool  = &allocator->memory_pools[p];
+        ret                 += pool->pages;
+    }
+
+    return ret;
+}
+
+
 /* Find a suitable block
  *
  * We start by looking at the first block of the appropriate order, if we get a block

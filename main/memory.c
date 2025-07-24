@@ -242,16 +242,11 @@ __attribute__((always_inline)) static inline void
 
 IRAM_ATTR void remap_task(task_info_t *task_info) {
     if (current_mapped_task) {
-        ESP_DRAM_LOGE(
-            DRAM_STR("map_task"),
-            "Expected task %u but actual current task is %u",
-            0,
-            current_mapped_task
-        );
+        ESP_DRAM_LOGE(DRAM_STR("map_task"), "Expected task %u but actual current task is %u", 0, current_mapped_task);
         esp_system_abort("Task info does not match");
     }
 
-    uint32_t mmu_id   = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
+    uint32_t mmu_id = mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
 
     allocation_range_t *r = task_info->allocations;
     while (r) {
@@ -672,6 +667,14 @@ uint32_t vaddr_to_paddr(uint32_t vaddr) {
     mmu_hal_vaddr_to_paddr(mmu_id, vaddr, &paddr, &target);
 
     return paddr;
+}
+
+size_t get_free_psram_pages() {
+    return buddy_get_free_pages(&page_allocator);
+}
+
+size_t get_total_psram_pages() {
+    return buddy_get_total_pages(&page_allocator);
 }
 
 void writeback_and_invalidate_task(task_info_t *task_info) {

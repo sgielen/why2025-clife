@@ -66,3 +66,4 @@ void   buddy_deallocate(allocator_t *allocator, void *ptr);
 // enum block_type buddy_get_type(void *ptr);
 // size_t          buddy_get_size(void *ptr);
 size_t buddy_get_free_pages(allocator_t *allocator);
+size_t buddy_get_total_pages(allocator_t *allocator);
