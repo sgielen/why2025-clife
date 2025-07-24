@@ -154,15 +154,16 @@ void draw(void *dev, int x, int y, int w, int h, void *pixels) {
 void get_framebuffer(void *dev, int num, void **pixels) {
     void            *fb0;
     void            *fb1;
-    st7703_device_t *device  = dev;
-    num                     += 1;
-    num                      = num > 2 ? 2 : num;
-    esp_lcd_dpi_panel_get_frame_buffer(device->disp_panel, num, &fb0, &fb1);
+    void            *fb2;
+    st7703_device_t *device = dev;
+    esp_lcd_dpi_panel_get_frame_buffer(device->disp_panel, 3, &fb0, &fb1, &fb2);
 
-    if (num == 1)
+    if (num == 0)
         *pixels = fb0;
-    if (num == 2)
+    if (num == 1)
         *pixels = fb1;
+    if (num == 2)
+        *pixels = fb2;
 }
 
 void set_refresh_cb(void *dev, void *user_data, void (*callback)(void *user_data)) {
@@ -173,6 +174,7 @@ void set_refresh_cb(void *dev, void *user_data, void (*callback)(void *user_data
         .on_color_trans_done = NULL,
     };
 
+    refresh_cb = callback;
     esp_lcd_dpi_panel_register_event_callbacks(device->disp_panel, &cbs, user_data);
 }
 
@@ -182,8 +184,9 @@ device_t *st7703_create() {
     device_t        *base_dev = (device_t *)dev;
     lcd_device_t    *lcd_dev  = (lcd_device_t *)dev;
 
-    lcd_dev->_draw  = draw;
-    lcd_dev->_getfb = get_framebuffer;
+    lcd_dev->_draw           = draw;
+    lcd_dev->_getfb          = get_framebuffer;
+    lcd_dev->_set_refresh_cb = set_refresh_cb;
 
     base_dev->type   = DEVICE_TYPE_LCD;
     base_dev->_open  = NULL;
