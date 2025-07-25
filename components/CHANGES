@@ -8,20 +8,26 @@
   - Use BadgeVMS memory management instead of esp-idf
   - Use BadgeVMS generated symbol list instead of hardcoded symbol list
 
-* freertos (From esp-idf v5.5-beta1-243-g25c7c11970)
+* freertos (From esp-idf v5.5)
   - Add trace hooks for traceTASK_SWITCHED_IN and traceTASK_SWITCHED_OUT
     - BadgeVMS uses these tracepoints to swap in and out the MMU mappings for each task
 
-* esp_lcd (From esp-idf v5.5-beta1-243-g25c7c11970)
+* esp_lcd (From esp-idf v5.5)
   - Use BadgeVMS framebuffer allocator instead of heap_caps_*
 
-* esp_psram (From esp-idf v5.5-beta1-243-g25c7c11970)
+* esp_psram (From esp-idf v5.5)
   - Disable default MMU mapping
     - BadgeVMS manages all PSRam MMU mappings
   - esp_psram_check_ptr_addr only checks for vaddr range, not actual mapping
 
-* esp_hw_support (From esp-idf v5.5-beta1-243-g25c7c11970)
+* esp_hw_support (From esp-idf v5.5)
   - Add an option to slightly increase PSRAM voltage
+
+* esp_tca8418
+  - Force version 1.2 of espressif:i2c_bus
+
+* hal (From esp-idf v5.5)
+  - Put all cache operations in IRAM
 
 * why_stdio (From picolibc)
   - Rename stdio functions with a why_ prefix

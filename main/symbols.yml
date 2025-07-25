@@ -1,7 +1,7 @@
 ---
 include:
+  # libstdc
   - complex.h
-  - compositor.h
   - ctype.h
   - fenv.h
   - float.h
@@ -13,7 +13,6 @@ include:
   - langinfo.h
   - locale.h
   - math.h
-  - misc_funcs.h
   - regex.h
   - sdkconfig.h
   - search.h
@@ -29,6 +28,11 @@ include:
   - unistd.h
   - wchar.h
   - wctype.h
+
+  # BadgeVMS
+  - compositor.h
+  - event.h
+  - misc_funcs.h
 
 simple_function:
 # libc.a
@@ -878,6 +882,7 @@ simple_function:
   - framebuffer_free
   - framebuffer_post
   - vaddr_to_paddr
+  - event_poll
 
 simple_function_extern:
   - __adddf3

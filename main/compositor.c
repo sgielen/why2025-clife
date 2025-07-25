@@ -17,11 +17,11 @@
 #include "compositor.h"
 
 #include "device.h"
-#include "drivers/keyboard.h"
 #include "driver/ppa.h"
 #include "esp_cache.h"
 #include "esp_log.h"
 #include "esp_private/esp_cache_private.h"
+#include "event.h"
 #include "memory.h"
 #include "task.h"
 
@@ -538,8 +538,8 @@ IRAM_ATTR static void draw_window_box(managed_framebuffer_t *framebuffer) {
 IRAM_ATTR static void on_refresh(void *ignored) {
     xSemaphoreGive(vsync);
 
-    //if (compositor_initialized) {
-    //}
+    // if (compositor_initialized) {
+    // }
 }
 
 IRAM_ATTR static bool
@@ -565,19 +565,33 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
     ppa_client_register_event_callbacks(ppa_srm_handle, &ppa_srm_callbacks);
 
     ESP_LOGI(TAG, "framebuffers[0] = %p, framebuffers[1] = %p", framebuffers[0], framebuffers[1]);
-
     while (1) {
         xSemaphoreTake(vsync, portMAX_DELAY);
-
-        keyboard_event_ll_t c;
-        // ssize_t res = keyboard_device->_read(keyboard_device, 0, &c, sizeof(keyboard_event_ll_t));
-        // if (res > 0) {
-        //    ESP_LOGE(TAG, "Got keyboard scancode 0x%08x, down: %i", c.scancode, c.down);
-        // }
 
         if (xSemaphoreTake(window_stack_lock, portMAX_DELAY) != pdTRUE) {
             ESP_LOGE(TAG, "Failed to get window list mutex");
             abort();
+        }
+
+        event_t c;
+        ssize_t res = keyboard_device->_read(keyboard_device, 0, &c, sizeof(event_t));
+        if (res > 0) {
+            if (c.e.keyboard.text && c.e.keyboard.down) {
+                // ESP_LOGE(TAG, "Got keyboard scancode 0x%08x, down: %i", c.scancode, c.down);
+                esp_rom_printf("%c", c.e.keyboard.text);
+            }
+
+            if (window_stack) {
+                if (c.e.keyboard.scancode == KEY_SCANCODE_TAB && c.e.keyboard.mod == KMOD_LALT && c.e.keyboard.down) {
+                    window_stack = window_stack->next;
+                    c.type       = EVENT_NONE;
+                }
+                if (c.type != EVENT_NONE) {
+                    if (xQueueSend(window_stack->task_info->event_queue, &c, 0) != pdTRUE) {
+                        ESP_LOGW(TAG, "Unable to send event to task");
+                    }
+                }
+            }
         }
 
         bool changes = false;
@@ -586,9 +600,11 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
             managed_framebuffer_t *framebuffer = window_stack->prev; // Start with back window
 
             do {
-                if (atomic_flag_test_and_set(&framebuffer->clean)) {
-                    goto next;
-                }
+                // if (atomic_flag_test_and_set(&framebuffer->clean)) {
+                //    goto next;
+                // }
+
+                // Send events to current window
 
                 changes = true;
 
@@ -637,12 +653,12 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                 };
 
                 ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config);
-                // esp_cache_msync(framebuffers[cur_fb], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+                esp_cache_msync(framebuffers[cur_fb], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
                 draw_window_box(framebuffer);
                 esp_cache_msync(framebuffers[cur_fb], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
 
                 xSemaphoreGive(framebuffer->ready);
-next:
+                // next:
                 framebuffer = framebuffer->prev;
             } while (framebuffer != window_stack->prev);
         }
@@ -653,7 +669,6 @@ next:
             lcd_device->_draw(lcd_device, 0, 0, FRAMEBUFFER_MAX_W, FRAMEBUFFER_MAX_H, framebuffers[cur_fb]);
             cur_fb = (cur_fb + 1) % 3;
         }
-
     }
 }
 

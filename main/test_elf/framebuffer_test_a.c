@@ -1,4 +1,5 @@
-#include "compositor.h"
+#include "badgevms/compositor.h"
+#include "badgevms/event.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -25,6 +26,8 @@ int main(int argc, char *argv[]) {
     memset(framebuffer->pixels, getpid() * 0xc, FB_WIDTH * FB_HEIGHT * 2);
     memset(framebuffer->pixels, 0xff, FB_WIDTH * 10);
 
+    bool vis = false;
+
     while (1) {
         struct timespec start_time, end_time;
         clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -33,8 +36,15 @@ int main(int argc, char *argv[]) {
         int offset = frame % FB_WIDTH;
         // int offset = (frame * 3) % FB_WIDTH;  // Move 3 pixels per frame
 
+        event_t e = event_poll(false, 0);
+        if (e.type == EVENT_KEY_DOWN) {
+            if (e.e.keyboard.scancode == KEY_SCANCODE_TAB) {
+                vis = !vis;
+            }
+        }
+
         static uint16_t row_template[FB_WIDTH];
-        if (getpid() % 2) {
+        if (vis) {
             for (int x = 0; x < FB_WIDTH; x++) {
                 int shifted_x = (x + offset) % FB_WIDTH;
 

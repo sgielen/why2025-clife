@@ -1,4 +1,4 @@
-#include "misc_funcs.h"
+#include "badgevms/misc_funcs.h"
 
 #include <stdbool.h>
 #include <stdio.h>

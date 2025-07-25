@@ -103,7 +103,7 @@ int app_main(void) {
     device_init();
     logical_names_system_init();
 
-    // device_register("KEYBOARD0", tca8418_keyboard_create());
+    device_register("KEYBOARD0", tca8418_keyboard_create());
     device_register("PANEL0", st7703_create());
     device_register("TT01", tty_create(true, true));
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
@@ -190,7 +190,7 @@ int app_main(void) {
 
     pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
-    // pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
 #if 0
@@ -202,7 +202,7 @@ int app_main(void) {
 #endif
 
     while (1) {
-        while (get_num_tasks() < 10) {
+        while (get_num_tasks() < 1) {
             sprintf(argv[1], "argv[%d]", 0);
             // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pida);

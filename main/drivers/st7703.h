@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../device.h"
+#include "device.h"
 #include "framebuffer.h"
 #include "sdkconfig.h"
 

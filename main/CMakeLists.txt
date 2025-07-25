@@ -14,10 +14,12 @@ idf_component_register(
 	 "pathfuncs.c"
 	 "task.c"
 	 "thirdparty/dlmalloc.c"
+	 "user_event.c"
 	 "wrapped_funcs.c"
     	 "why2025_firmware.c"
     INCLUDE_DIRS
 	 ${CMAKE_CURRENT_SOURCE_DIR}/
+	 ${CMAKE_CURRENT_SOURCE_DIR}/../include/badgevms
 	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     EMBED_FILES
     	"${CMAKE_BINARY_DIR}/test_elfs/framebuffer_test_a.elf"
@@ -27,7 +29,7 @@ idf_component_register(
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
 	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_a.elf"
 	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
-     PRIV_REQUIRES
+    PRIV_REQUIRES
 	"esp_driver_ppa"
 	"esp_lcd_st7703"
 	"esp_psram"
@@ -35,6 +37,7 @@ idf_component_register(
 	"fatfs"
 	"vfs"
         "esp_mm"
+	"hal"
 )
 
 set(TEST_COMPILER ${CMAKE_C_COMPILER})
@@ -69,8 +72,8 @@ function(build_test_elf name source)
             -fvisibility=hidden
 	    -Wl,--gc-sections
 	    -e main
-	    -I${CMAKE_CURRENT_SOURCE_DIR}
-	    -I${CMAKE_CURRENT_SOURCE_DIR}/../main
+	    -isystem${CMAKE_CURRENT_SOURCE_DIR}/../include
+	    -I${CMAKE_CURRENT_SOURCE_DIR}/../include/badgevms
             -o ${TEST_ELF_DIR}/${name}.elf
             ${CMAKE_CURRENT_SOURCE_DIR}/${source}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}

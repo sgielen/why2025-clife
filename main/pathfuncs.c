@@ -22,6 +22,15 @@
 
 #include <string.h>
 
+static inline bool is_valid_device_char(char c) {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' ||
+           c == '$';
+}
+
+static inline bool is_valid_path_char(char c) {
+    return is_valid_device_char(c) || c == '.';
+}
+
 // Parse a path in the form of DEVICE:[DIR.SUBDIR]FILENAME.EXT
 path_parse_result_t parse_path(char const *path, path_t *result) {
     result->buffer    = NULL;
