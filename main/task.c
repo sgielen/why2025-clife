@@ -50,6 +50,11 @@ IRAM_ATTR static task_info_t       kernel_task = {
           .psram      = &kernel_task_psram,
 };
 
+typedef struct {
+    TaskFunction_t entry;
+    void          *pvParameters;
+} kernel_task_param_t;
+
 static uint32_t num_tasks = 0;
 
 static task_info_t      *process_table[NUM_PIDS];
@@ -501,6 +506,36 @@ static void IRAM_ATTR zeus(void *ignored) {
     }
 }
 
+void kernel_task_base(void *pvParameters) {
+    kernel_task_param_t *params = pvParameters;
+    vTaskSetThreadLocalStoragePointer(NULL, 0, &kernel_task);
+
+    TaskFunction_t entry           = params->entry;
+    void          *task_parameters = params->pvParameters;
+
+    free(params);
+
+    entry(task_parameters);
+}
+
+BaseType_t create_kernel_task(
+    TaskFunction_t      pvTaskCode,
+    char const *const   pcName,
+    uint32_t const      usStackDepth,
+    void *const         pvParameters,
+    UBaseType_t         uxPriority,
+    TaskHandle_t *const pvCreatedTask,
+    BaseType_t const    xCoreID
+) {
+    kernel_task_param_t *params = calloc(1, sizeof(kernel_task_param_t));
+    params->entry               = pvTaskCode;
+    params->pvParameters        = pvParameters;
+
+    BaseType_t ret =
+        xTaskCreatePinnedToCore(kernel_task_base, pcName, usStackDepth, params, uxPriority, pvCreatedTask, xCoreID);
+    return ret;
+}
+
 void task_init() {
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Initializing");
 
@@ -531,11 +566,9 @@ void task_init() {
     hades_queue = xQueueCreate(16, sizeof(pid_t));
     // Hades has higher priority than Zeus. This prevents dead tasks from piling up
     // while Zeus tries to spawn new ones
-    xTaskCreatePinnedToCore(hades, "Hades", 2048, NULL, 11, &hades_handle, 1);
-    vTaskSetThreadLocalStoragePointer(hades_handle, 0, &kernel_task);
+    create_kernel_task(hades, "Hades", 2048, NULL, 11, &hades_handle, 1);
 
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Starting Zeus process");
     zeus_queue = xQueueCreate(16, sizeof(task_info_t *));
-    xTaskCreatePinnedToCore(zeus, "Zeus", 2048, NULL, 10, &zeus_handle, 1);
-    vTaskSetThreadLocalStoragePointer(zeus_handle, 0, &kernel_task);
+    create_kernel_task(zeus, "Zeus", 2048, NULL, 10, &zeus_handle, 1);
 }

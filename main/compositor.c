@@ -706,6 +706,6 @@ void compositor_init(char const *lcd_device_name, char const *keyboard_device_na
     window_stack_lock = xSemaphoreCreateMutex();
     vsync             = xSemaphoreCreateBinary();
     ppa               = xSemaphoreCreateBinary();
-    xTaskCreatePinnedToCore(compositor, "Compositor", 4096, NULL, 20, &compositor_handle, 0);
+    create_kernel_task(compositor, "Compositor", 4096, NULL, 20, &compositor_handle, 0);
     compositor_initialized = true;
 }

@@ -115,3 +115,13 @@ void         task_record_resource_alloc(task_resource_type_t type, void *ptr);
 void         task_record_resource_free(task_resource_type_t type, void *ptr);
 uint32_t     get_num_tasks();
 task_info_t *get_taskinfo_for_pid(pid_t pid);
+
+BaseType_t create_kernel_task(
+    TaskFunction_t      pvTaskCode,
+    char const *const   pcName,
+    uint32_t const      usStackDepth,
+    void *const         pvParameters,
+    UBaseType_t         uxPriority,
+    TaskHandle_t *const pvCreatedTask,
+    BaseType_t const    xCoreID
+);
