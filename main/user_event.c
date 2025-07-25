@@ -1,0 +1,32 @@
+/* This file is part of BadgeVMS
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "event.h"
+#include "freertos/FreeRTOS.h"
+#include "task.h"
+
+event_t event_poll(bool block, uint32_t timeout_msec) {
+    task_info_t *task_info = get_task_info();
+
+    event_t    e;
+    TickType_t wait = block ? portMAX_DELAY : timeout_msec / portTICK_PERIOD_MS;
+
+    if (xQueueReceive(task_info->event_queue, &e, wait) != pdTRUE) {
+        e.type = EVENT_NONE;
+    }
+
+    return e;
+}
