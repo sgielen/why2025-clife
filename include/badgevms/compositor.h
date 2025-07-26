@@ -16,15 +16,59 @@
 
 #pragma once
 
+#include "event.h"
 #include "framebuffer.h"
 #include "pixel_formats.h"
 
 #include <stdbool.h>
 
-framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h);
-void           framebuffer_free(framebuffer_t *framebuffer);
-void           framebuffer_post(framebuffer_t *framebuffer, bool block);
+typedef enum {
+    WINDOW_FLAG_NONE            = 0,
+    WINDOW_FLAG_FULLSCREEN      = (1 << 0), // Only one fullscreen application can run at a tim
+    WINDOW_FLAG_ALWAYS_ON_TOP   = (1 << 1), // Does not apply to fullscreen apps
+    WINDOW_FLAG_UNDECORATED     = (1 << 2), // Create a floating window
+    WINDOW_FLAG_MAXIMIZED       = (1 << 3), // Create an application window of the maximum size
+    WINDOW_FLAG_MAXIMIZED_LEFT  = (1 << 4), // Create a window and have it cover the whole left of the screen
+    WINDOW_FLAG_MAXIMIZED_RIGHT = (1 << 5), // Create a window and have it cover the whole right of the screen
+} window_flag_t;
 
-void compositor_init(char const *lcd_device, char const *keyboard_device);
+typedef struct {
+    int x;
+    int y;
+} window_coords_t;
+
+typedef struct {
+    int w;
+    int h;
+} window_size_t;
+
+typedef struct {
+    int x, y;
+    int w, h;
+} window_rect_t;
+
+typedef struct window *window_handle_t;
+
+window_handle_t window_create(char const *title, window_size_t size, window_flag_t flags);
+void            window_destroy(window_handle_t window);
+
+char const *window_title_get(window_handle_t window);
+void        window_title_set(window_handle_t window, char const *title);
+
+window_coords_t window_position_get(window_handle_t window);
+window_coords_t window_position_set(window_handle_t window, window_coords_t coords);
+
+window_size_t window_size_get(window_handle_t window);
+window_size_t window_size_set(window_handle_t window, window_size_t size);
+
+window_flag_t window_flags_get(window_handle_t window);
+window_flag_t window_flags_set(window_handle_t window, window_flag_t flags);
+
+framebuffer_t *window_framebuffer_allocate(window_handle_t window, window_size_t size, int *num);
+void           window_framebuffer_free(window_handle_t window, int num);
+framebuffer_t *window_framebuffer_get(window_handle_t window, int num);
+void window_framebuffer_update(window_handle_t window, int num, bool block, window_rect_t *rects, int num_rects);
+
+event_t window_event_poll(window_handle_t window, bool block, uint32_t timeout_msec);
 
 void get_screen_info(int *width, int *height, pixel_format_t *format, float *refresh_rate);

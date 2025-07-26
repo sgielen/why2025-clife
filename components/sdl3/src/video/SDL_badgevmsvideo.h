@@ -26,13 +26,14 @@
 
 #include "../../SDL3/src/video/SDL_sysvideo.h"
 
-#include "framebuffer.h"
 #include "compositor.h"
 #include "event.h"
+#include "framebuffer.h"
 
-typedef struct SDL_WindowData {
+typedef struct SDL_WindowData
+{
     SDL_Window *window;
-    framebuffer_t *framebuffer;
+    window_handle_t badgevms_window;
 } SDL_WindowData;
 
 extern bool BADGEVMS_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props);

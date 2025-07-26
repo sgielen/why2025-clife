@@ -20,7 +20,7 @@
 #error "BadgeVMS requires esp-idf 5.50 (or maybe later, who knows)"
 #endif
 
-#include "compositor.h"
+#include "compositor/compositor_private.h"
 #include "device.h"
 #include "drivers/fatfs.h"
 #include "drivers/st7703.h"
@@ -198,7 +198,7 @@ int app_main(void) {
     pid_t pidb = run_task(sdl_test_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
-    // pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
 #if 0

@@ -45,5 +45,3 @@ typedef struct {
         keyboard_event_t keyboard;
     } e;
 } event_t;
-
-event_t event_poll(bool block, uint32_t timeout_msec);

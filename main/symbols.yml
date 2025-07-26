@@ -882,11 +882,23 @@ simple_function:
   - ynf
 
 # BadgeVMS
-  - framebuffer_allocate
-  - framebuffer_free
-  - framebuffer_post
+  - get_screen_info
   - vaddr_to_paddr
-  - event_poll
+  - window_create
+  - window_destroy
+  - window_event_poll
+  - window_flags_get
+  - window_flags_set
+  - window_framebuffer_allocate
+  - window_framebuffer_free
+  - window_framebuffer_get
+  - window_framebuffer_update
+  - window_position_get
+  - window_position_set
+  - window_size_get
+  - window_size_set
+  - window_title_get
+  - window_title_set
 
 # SDL3
   - SDL_CloseJoystick

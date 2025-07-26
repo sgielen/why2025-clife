@@ -17,6 +17,7 @@
 #include "task.h"
 
 #include "bitfuncs.h"
+#include "compositor.h"
 #include "esp_elf.h"
 #include "esp_log.h"
 #include "event.h"
@@ -166,13 +167,6 @@ static task_info_t *task_info_init() {
         return NULL;
     }
 
-    task_info->event_queue = xQueueCreate(MAX_EVENTS, sizeof(event_t));
-    if (!task_info->event_queue) {
-        ESP_LOGE(TAG, "Out of memory trying to allocate task event queue");
-        free(task_info);
-        return NULL;
-    }
-
     task_info->current_files                  = 3;
     task_info->psram->file_handles[0].is_open = true;
     task_info->psram->file_handles[0].device  = device_get("TT01");
@@ -226,6 +220,7 @@ static void task_info_delete(task_info_t *task_info) {
                     case RES_OPEN:
                         // Already handled above
                         break;
+                    case RES_WINDOW: window_destroy(ptr); break;
                     default: ESP_LOGE(TAG, "Unknown resource type %i in task_info_delete", type);
                 }
             }
@@ -234,7 +229,6 @@ static void task_info_delete(task_info_t *task_info) {
         kh_destroy(restable, task_info->resources[i]);
     }
 
-    vQueueDelete(task_info->event_queue);
     free(task_info->argv_back);
     heap_caps_free(task_info->psram);
     free(task_info);

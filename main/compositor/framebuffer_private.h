@@ -16,12 +16,5 @@
 
 #pragma once
 
-#define FRAMEBUFFER_MAX_W       720
-#define FRAMEBUFFER_MAX_H       720
-#define FRAMEBUFFER_MAX_REFRESH 60
-#define FRAMEBUFFER_BPP         2 // 16 bits per pixel
-
-#define FRAMEBUFFER_BYTES (FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_W * FRAMEBUFFER_BPP)
-
-#define WINDOW_MAX_FRAMEBUFFER 2
-#define WINDOW_MAX_EVENTS      10
+#include "../../include/badgevms/framebuffer.h"
+framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h);

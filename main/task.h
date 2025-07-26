@@ -37,12 +37,10 @@ KHASH_MAP_INIT_INT(restable, int);
 #define MAX_PID         127
 #define MIN_STACK_SIZE  8192
 
-#define MAX_EVENTS 10
-
 #define TASK_PRIORITY            5
 #define TASK_PRIORITY_FOREGROUND 6
 
-typedef enum { RES_ICONV_OPEN, RES_REGCOMP, RES_OPEN, RES_RESOURCE_TYPE_MAX } task_resource_type_t;
+typedef enum { RES_ICONV_OPEN, RES_REGCOMP, RES_OPEN, RES_WINDOW, RES_RESOURCE_TYPE_MAX } task_resource_type_t;
 
 typedef enum {
     TASK_TYPE_ELF,
@@ -82,7 +80,6 @@ typedef struct task_info {
     uintptr_t           heap_start;
     uintptr_t           heap_end;
     uint16_t            stack_size;
-    QueueHandle_t       event_queue;
     void (*task_entry)(struct task_info *task_info);
 
     // Small variables

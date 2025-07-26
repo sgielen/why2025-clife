@@ -47,4 +47,4 @@ typedef struct {
     uint16_t bg_window_outer_border;      // Window frame border (light gray)
 } window_colors_t;
 
-void draw_window_box(uint16_t *fb, managed_framebuffer_t *framebuffer, bool foreground);
+void draw_window_box(uint16_t *fb, window_t *window, bool foreground);

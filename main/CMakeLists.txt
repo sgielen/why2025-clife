@@ -149,6 +149,7 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
 )
 target_compile_options(${COMPONENT_LIB} PRIVATE
 	-Wno-empty-body	
+	-Wno-stringop-overflow
 )
 
 set(image ../fatfs_image)

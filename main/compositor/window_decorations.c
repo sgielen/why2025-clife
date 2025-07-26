@@ -50,11 +50,11 @@ IRAM_ATTR static window_colors_t window_colors = {
     .bg_window_outer_border      = RGB565(200, 200, 200), // Light gray
 };
 
-IRAM_ATTR void draw_window_box(uint16_t *fb, managed_framebuffer_t *framebuffer, bool foreground) {
-    int x      = framebuffer->x;
-    int y      = framebuffer->y;
-    int width  = framebuffer->framebuffer.w;
-    int height = framebuffer->framebuffer.h;
+IRAM_ATTR void draw_window_box(uint16_t *fb, window_t *window, bool foreground) {
+    int x      = window->position.x;
+    int y      = window->position.y;
+    int width  = window->size.w;
+    int height = window->size.h;
 
     int total_width  = width + 2 * BORDER_PX;
     int total_height = height + BORDER_TOP_PX;

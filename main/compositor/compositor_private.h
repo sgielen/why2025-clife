@@ -16,20 +16,43 @@
 
 #pragma once
 
+#include "badgevms_config.h"
+#include "compositor.h"
 #include "framebuffer.h"
 #include "memory.h"
 #include "task.h"
 
+#include <stdatomic.h>
+
+#define TOP_BAR_PX  50
+#define SIDE_BAR_PX 0
+
 typedef struct managed_framebuffer {
     framebuffer_t       framebuffer;
+    int                 w;
+    int                 h;
+    pixel_format_t      format;
     allocation_range_t *pages;
     size_t              num_pages;
-    uint16_t            x;
-    uint16_t            y;
-    task_info_t        *task_info;
     atomic_flag         clean;
+    atomic_bool         active;
     SemaphoreHandle_t   ready;
-
-    struct managed_framebuffer *next;
-    struct managed_framebuffer *prev;
 } managed_framebuffer_t;
+
+typedef struct window {
+    managed_framebuffer_t *framebuffers[WINDOW_MAX_FRAMEBUFFER];
+    int                    num_fb;
+    int                    cur_fb;
+    window_flag_t          flags;
+    char                  *title;
+
+    window_size_t   size;
+    window_coords_t position;
+    task_info_t    *task_info;
+    QueueHandle_t   event_queue;
+
+    struct window *next;
+    struct window *prev;
+} window_t;
+
+void compositor_init(char const *lcd_device_name, char const *keyboard_device_name);

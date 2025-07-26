@@ -23,15 +23,15 @@
 
 #ifdef SDL_VIDEO_DRIVER_BADGEVMS
 
-#include "../../SDL3/src/video/SDL_sysvideo.h"
-#include "../../SDL3/src/video/SDL_pixels_c.h"
 #include "../../SDL3/src/events/SDL_events_c.h"
+#include "../../SDL3/src/video/SDL_pixels_c.h"
+#include "../../SDL3/src/video/SDL_sysvideo.h"
 
-#include "SDL_badgevmsvideo.h"
 #include "SDL_badgevmsevents_c.h"
 #include "SDL_badgevmsframebuffer_c.h"
+#include "SDL_badgevmsvideo.h"
 
-#define BADGEVMSVID_DRIVER_NAME       "badgevms"
+#define BADGEVMSVID_DRIVER_NAME "badgevms"
 
 static bool BADGEVMS_VideoInit(SDL_VideoDevice *_this);
 static void BADGEVMS_VideoQuit(SDL_VideoDevice *_this);
@@ -48,10 +48,11 @@ bool BADGEVMS_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Prope
         return false;
     }
 
-    data->framebuffer = framebuffer_allocate(w, h);
-    if (!data->framebuffer) {
+    window_size_t size = { window->w, window->h };
+    data->badgevms_window = window_create(window->title, size, WINDOW_FLAG_NONE);
+    if (!data->badgevms_window) {
         SDL_free(data);
-        return SDL_SetError("Could not create BadgeVMS framebuffer");
+        return SDL_SetError("Could not create BadgeVMS window");
     }
 
     data->window = window;
@@ -64,8 +65,8 @@ static void BADGEVMS_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window)
 {
     SDL_WindowData *data = window->internal;
     if (data) {
-        if (data->framebuffer) {
-            framebuffer_free(data->framebuffer);
+        if (data->badgevms_window) {
+            window_destroy(data->badgevms_window);
         }
         SDL_free(data);
         window->internal = NULL;
@@ -117,9 +118,9 @@ static SDL_VideoDevice *BADGEVMS_InternalCreateDevice(const char *enable_hint)
     device->CreateWindowFramebuffer = SDL_BADGEVMS_CreateWindowFramebuffer;
     device->UpdateWindowFramebuffer = SDL_BADGEVMS_UpdateWindowFramebuffer;
     device->DestroyWindowFramebuffer = SDL_BADGEVMS_DestroyWindowFramebuffer;
-    
-    device->GetDisplayModes = NULL;  // Use default
-    device->SetDisplayMode = NULL;   // Use default
+
+    device->GetDisplayModes = NULL; // Use default
+    device->SetDisplayMode = NULL;  // Use default
     device->free = BADGEVMS_DeleteDevice;
 
     printf("BADGEVMS: Video device created successfully\n");
@@ -148,9 +149,9 @@ bool BADGEVMS_VideoInit(SDL_VideoDevice *_this)
     SDL_zero(mode);
     pixel_format_t tmp;
     // BadgeVMS pixel formats are the same as SDL3
-    get_screen_info(&mode.w, &mode.h, ((pixel_format_t*)&mode.format), &mode.refresh_rate);
-    
-    printf("BADGEVMS_VideoInit: Adding display mode %dx%d, format=%s\n", 
+    get_screen_info(&mode.w, &mode.h, ((pixel_format_t *)&mode.format), &mode.refresh_rate);
+
+    printf("BADGEVMS_VideoInit: Adding display mode %dx%d, format=%s\n",
            mode.w, mode.h, SDL_GetPixelFormatName(mode.format));
 
     display_id = SDL_AddBasicVideoDisplay(&mode);

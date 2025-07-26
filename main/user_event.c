@@ -14,17 +14,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "compositor/compositor_private.h"
 #include "event.h"
 #include "freertos/FreeRTOS.h"
 #include "task.h"
 
-event_t event_poll(bool block, uint32_t timeout_msec) {
-    task_info_t *task_info = get_task_info();
+event_t event_poll(window_t *window, bool block, uint32_t timeout_msec) {
 
     event_t    e;
     TickType_t wait = block ? portMAX_DELAY : timeout_msec / portTICK_PERIOD_MS;
 
-    if (xQueueReceive(task_info->event_queue, &e, wait) != pdTRUE) {
+    if (xQueueReceive(window->event_queue, &e, wait) != pdTRUE) {
         e.type = EVENT_NONE;
     }
 

@@ -26,33 +26,56 @@
 #include "../../SDL3/src/events/SDL_events_c.h"
 #include "../../SDL3/src/events/SDL_keyboard_c.h"
 
-#include "SDL_badgevmsvideo.h"
 #include "SDL_badgevmsevents_c.h"
+#include "SDL_badgevmsvideo.h"
 
 void BADGEVMS_PumpEvents(SDL_VideoDevice *_this)
 {
-    event_t badgevms_event;
-    SDL_Event sdl_event;
+    SDL_DisplayID display_id = SDL_GetPrimaryDisplay();
+    if (display_id == 0) {
+        return;
+    }
 
-    // Poll all available events
-    while (true) {
-        badgevms_event = event_poll(false, 0);
-        
-        if (badgevms_event.type == EVENT_NONE) {
-            break;  // No more events
+    // Get all windows on this display
+    SDL_Window **windows = SDL_GetWindows(NULL);
+    if (!windows) {
+        return;
+    }
+
+    // Poll events from each window
+    for (int i = 0; windows[i] != 0; i++) {
+        SDL_Window *sdl_window = windows[i];
+        if (!sdl_window || !sdl_window->internal) {
+            continue;
         }
-        
-        SDL_zero(sdl_event);
-        
-        switch (badgevms_event.type) {
+
+        SDL_WindowData *window_data = (SDL_WindowData *)sdl_window->internal;
+        if (!window_data->badgevms_window) {
+            continue;
+        }
+
+        event_t badgevms_event;
+        SDL_Event sdl_event;
+
+        while (true) {
+            badgevms_event = window_event_poll(window_data->badgevms_window, false, 0);
+
+            if (badgevms_event.type == EVENT_NONE) {
+                break; // No more events from this window
+            }
+
+            SDL_zero(sdl_event);
+
+            switch (badgevms_event.type) {
             case EVENT_QUIT:
                 sdl_event.type = SDL_EVENT_QUIT;
                 SDL_PushEvent(&sdl_event);
                 break;
-                
+
             case EVENT_KEY_DOWN:
             case EVENT_KEY_UP:
                 sdl_event.type = badgevms_event.e.keyboard.down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+                sdl_event.key.windowID = SDL_GetWindowID(sdl_window);
                 sdl_event.key.scancode = badgevms_event.e.keyboard.scancode;
                 sdl_event.key.key = badgevms_event.e.keyboard.key;
                 sdl_event.key.mod = badgevms_event.e.keyboard.mod;
@@ -60,21 +83,24 @@ void BADGEVMS_PumpEvents(SDL_VideoDevice *_this)
                 sdl_event.key.repeat = badgevms_event.e.keyboard.repeat;
                 sdl_event.key.timestamp = SDL_GetTicksNS();
                 SDL_PushEvent(&sdl_event);
-                
+
                 if (badgevms_event.e.keyboard.down && badgevms_event.e.keyboard.text != 0) {
                     char text[2] = { badgevms_event.e.keyboard.text, 0 };
                     SDL_SendKeyboardText(text);
                 }
                 break;
-                
+
             case EVENT_WINDOW_RESIZE:
                 break;
-                
+
             default:
                 // Unknown event type, ignore
                 break;
+            }
         }
     }
+
+    SDL_free(windows);
 }
 
 #endif // SDL_VIDEO_DRIVER_BADGEVMS

@@ -18,24 +18,24 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "SDL_internal.h"
 #include "../../main/thirdparty/dlmalloc.h"
+#include "SDL_internal.h"
 
 /* This file contains portable memory management functions for SDL */
 
-#define real_malloc dlmalloc
-#define real_calloc dlcalloc
+#define real_malloc  dlmalloc
+#define real_calloc  dlcalloc
 #define real_realloc dlrealloc
-#define real_free dlfree
+#define real_free    dlfree
 
 // mark the allocator entry points as KEEPALIVE so we can call these from JavaScript.
 // otherwise they could could get so aggressively inlined that their symbols
 // don't exist at all in the final binary!
 #ifdef SDL_PLATFORM_EMSCRIPTEN
 #include <emscripten/emscripten.h>
-extern SDL_DECLSPEC SDL_MALLOC EMSCRIPTEN_KEEPALIVE void * SDLCALL SDL_malloc(size_t size);
-extern SDL_DECLSPEC SDL_MALLOC SDL_ALLOC_SIZE2(1, 2) EMSCRIPTEN_KEEPALIVE void * SDLCALL SDL_calloc(size_t nmemb, size_t size);
-extern SDL_DECLSPEC SDL_ALLOC_SIZE(2) EMSCRIPTEN_KEEPALIVE void * SDLCALL SDL_realloc(void *mem, size_t size);
+extern SDL_DECLSPEC SDL_MALLOC EMSCRIPTEN_KEEPALIVE void *SDLCALL SDL_malloc(size_t size);
+extern SDL_DECLSPEC SDL_MALLOC SDL_ALLOC_SIZE2(1, 2) EMSCRIPTEN_KEEPALIVE void *SDLCALL SDL_calloc(size_t nmemb, size_t size);
+extern SDL_DECLSPEC SDL_ALLOC_SIZE(2) EMSCRIPTEN_KEEPALIVE void *SDLCALL SDL_realloc(void *mem, size_t size);
 extern SDL_DECLSPEC EMSCRIPTEN_KEEPALIVE void SDLCALL SDL_free(void *mem);
 #endif
 
@@ -54,13 +54,12 @@ static struct
 // Define this if you want to track the number of allocations active
 // #define SDL_TRACK_ALLOCATION_COUNT
 #ifdef SDL_TRACK_ALLOCATION_COUNT
-#define INCREMENT_ALLOCATION_COUNT()    (void)SDL_AtomicIncRef(&s_mem.num_allocations)
-#define DECREMENT_ALLOCATION_COUNT()    (void)SDL_AtomicDecRef(&s_mem.num_allocations)
+#define INCREMENT_ALLOCATION_COUNT() (void)SDL_AtomicIncRef(&s_mem.num_allocations)
+#define DECREMENT_ALLOCATION_COUNT() (void)SDL_AtomicDecRef(&s_mem.num_allocations)
 #else
 #define INCREMENT_ALLOCATION_COUNT()
 #define DECREMENT_ALLOCATION_COUNT()
 #endif
-
 
 void SDL_GetOriginalMemoryFunctions(SDL_malloc_func *malloc_func,
                                     SDL_calloc_func *calloc_func,
@@ -101,9 +100,9 @@ void SDL_GetMemoryFunctions(SDL_malloc_func *malloc_func,
 }
 
 bool SDL_SetMemoryFunctions(SDL_malloc_func malloc_func,
-                                SDL_calloc_func calloc_func,
-                                SDL_realloc_func realloc_func,
-                                SDL_free_func free_func)
+                            SDL_calloc_func calloc_func,
+                            SDL_realloc_func realloc_func,
+                            SDL_free_func free_func)
 {
     if (!malloc_func) {
         return SDL_InvalidParamError("malloc_func");

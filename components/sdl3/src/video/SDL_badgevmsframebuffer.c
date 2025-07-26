@@ -23,8 +23,8 @@
 
 #ifdef SDL_VIDEO_DRIVER_BADGEVMS
 
-#include "../../SDL3/src/video/SDL_sysvideo.h"
 #include "../../SDL3/src/SDL_properties_c.h"
+#include "../../SDL3/src/video/SDL_sysvideo.h"
 #include "SDL_badgevmsframebuffer_c.h"
 #include "SDL_badgevmsvideo.h"
 
@@ -34,30 +34,28 @@ bool SDL_BADGEVMS_CreateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *wi
 {
     SDL_WindowData *data = window->internal;
     SDL_Surface *surface;
-    const SDL_PixelFormat surface_format = SDL_PIXELFORMAT_BGR565;
-    int w, h;
 
-    if (!data || !data->framebuffer) {
+    if (!data || !data->badgevms_window) {
         return SDL_SetError("Window not properly initialized");
     }
 
-    SDL_GetWindowSizeInPixels(window, &w, &h);
-    
-    // Create SDL surface that wraps our BadgeVMS framebuffer
-    surface = SDL_CreateSurfaceFrom(data->framebuffer->w, data->framebuffer->h, 
-                                   surface_format, 
-                                   data->framebuffer->pixels, 
-                                   data->framebuffer->w * 2);
+    window_size_t size;
+    SDL_GetWindowSizeInPixels(window, &size.w, &size.h);
+    int fb_num = 0;
+    framebuffer_t *newfb = window_framebuffer_allocate(data->badgevms_window, size, &fb_num);
+
+    // BadgeVMS pixel formats are the same as this version of SDL
+    surface = SDL_CreateSurfaceFrom(newfb->w, newfb->h, newfb->format, newfb->pixels, newfb->w * 2);
     if (!surface) {
         return false;
     }
 
     SDL_SetSurfaceProperty(SDL_GetWindowProperties(window), BADGEVMS_SURFACE, surface);
-    
-    *format = surface_format;
+
+    *format = newfb->format;
     *pixels = surface->pixels;
     *pitch = surface->pitch;
-    
+
     return true;
 }
 
@@ -66,7 +64,7 @@ bool SDL_BADGEVMS_UpdateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *wi
     SDL_WindowData *data = window->internal;
     SDL_Surface *surface;
 
-    if (!data || !data->framebuffer) {
+    if (!data || !data->badgevms_window) {
         return SDL_SetError("Window not properly initialized");
     }
 
@@ -75,19 +73,22 @@ bool SDL_BADGEVMS_UpdateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *wi
         return SDL_SetError("Couldn't find BadgeVMS surface for window");
     }
 
-    framebuffer_post(data->framebuffer, true);
+    window_framebuffer_update(data->badgevms_window, 0, true, NULL, 0);
 
     return true;
 }
 
 void SDL_BADGEVMS_DestroyWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *window)
 {
+    SDL_WindowData *data = window->internal;
     SDL_Surface *surface;
-    
+
     surface = (SDL_Surface *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), BADGEVMS_SURFACE, NULL);
     if (surface) {
+        window_framebuffer_free(data->badgevms_window, 0);
         SDL_DestroySurface(surface);
     }
+
     SDL_ClearProperty(SDL_GetWindowProperties(window), BADGEVMS_SURFACE);
 }
 

@@ -234,7 +234,7 @@ static ssize_t tca8418_lseek(void *dev, int fd, off_t offset, int whence) {
 }
 
 device_t *tca8418_keyboard_create() {
-    tca8418_device_t *dev      = malloc(sizeof(tca8418_device_t));
+    tca8418_device_t *dev      = calloc(1, sizeof(tca8418_device_t));
     device_t         *base_dev = (device_t *)dev;
 
     base_dev->type   = DEVICE_TYPE_KEYBOARD;

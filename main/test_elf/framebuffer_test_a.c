@@ -1,5 +1,6 @@
 #include "badgevms/compositor.h"
 #include "badgevms/event.h"
+#include "badgevms/framebuffer.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -10,13 +11,18 @@
 #include <unistd.h> // for usleep
 
 // Configurable framebuffer dimensions
-#define FB_WIDTH  720 / 2
-#define FB_HEIGHT 720 / 2
+#define FB_WIDTH  (720 / 2)
+#define FB_HEIGHT (720 / 2)
 
 int main(int argc, char *argv[]) {
-    framebuffer_t *framebuffer          = framebuffer_allocate(FB_WIDTH, FB_HEIGHT);
-    int            frame                = 0;
-    long const     target_frame_time_us = 16667; // 60 FPS in microseconds
+    window_size_t size;
+    size.w = FB_WIDTH;
+    size.h = FB_HEIGHT;
+
+    window_handle_t window               = window_create("FB test", size, WINDOW_FLAG_NONE);
+    framebuffer_t  *framebuffer          = window_framebuffer_allocate(window, size, NULL);
+    int             frame                = 0;
+    long const      target_frame_time_us = 16667; // 60 FPS in microseconds
 
     // FPS tracking variables
     int             frames_rendered = 0;
@@ -36,7 +42,7 @@ int main(int argc, char *argv[]) {
         int offset = frame % FB_WIDTH;
         // int offset = (frame * 3) % FB_WIDTH;  // Move 3 pixels per frame
 
-        event_t e = event_poll(false, 0);
+        event_t e = window_event_poll(window, false, 0);
         if (e.type == EVENT_KEY_DOWN) {
             if (e.e.keyboard.scancode == KEY_SCANCODE_TAB) {
                 vis = !vis;
@@ -102,7 +108,7 @@ int main(int argc, char *argv[]) {
         struct timespec post_start_time;
         clock_gettime(CLOCK_MONOTONIC, &post_start_time);
 
-        framebuffer_post(framebuffer, true);
+        window_framebuffer_update(window, 0, true, NULL, 0);
 
         // Calculate how long the frame took
         clock_gettime(CLOCK_MONOTONIC, &end_time);
