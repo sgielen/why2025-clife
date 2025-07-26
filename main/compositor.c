@@ -404,12 +404,14 @@ framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
     fb_count++;
 
     // vTaskPrioritySet(framebuffer->task_info->handle, TASK_PRIORITY_FOREGROUND);
-    ESP_LOGI(
+    ESP_LOGW(
         TAG,
-        "Allocated framebuffer at %p, pixels at %p, size %zi",
+        "Allocated framebuffer at %p, pixels at %p, size %zi, dimensions %u x %u",
         framebuffer,
         framebuffer->framebuffer.pixels,
-        num_pages
+        num_pages,
+        framebuffer->framebuffer.w,
+        framebuffer->framebuffer.h
     );
 
     if (compositor_initialized) {
@@ -548,7 +550,6 @@ IRAM_ATTR static bool
     return true;
 }
 
-// Fixed compositor function
 static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
     static ppa_client_handle_t ppa_srm_handle = NULL;
 
@@ -574,22 +575,18 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
         }
 
         event_t c;
+        c.type = EVENT_NONE;
         ssize_t res = keyboard_device->_read(keyboard_device, 0, &c, sizeof(event_t));
-        if (res > 0) {
-            if (c.e.keyboard.text && c.e.keyboard.down) {
-                // ESP_LOGE(TAG, "Got keyboard scancode 0x%08x, down: %i", c.scancode, c.down);
-                esp_rom_printf("%c", c.e.keyboard.text);
+
+        if (window_stack) {
+            if (c.e.keyboard.scancode == KEY_SCANCODE_TAB && c.e.keyboard.mod == BADGEVMS_KMOD_LALT && c.e.keyboard.down) {
+                window_stack = window_stack->next;
+                c.type       = EVENT_NONE;
             }
 
-            if (window_stack) {
-                if (c.e.keyboard.scancode == KEY_SCANCODE_TAB && c.e.keyboard.mod == KMOD_LALT && c.e.keyboard.down) {
-                    window_stack = window_stack->next;
-                    c.type       = EVENT_NONE;
-                }
-                if (c.type != EVENT_NONE) {
-                    if (xQueueSend(window_stack->task_info->event_queue, &c, 0) != pdTRUE) {
-                        ESP_LOGW(TAG, "Unable to send event to task");
-                    }
+            if (c.type != EVENT_NONE) {
+                if (xQueueSend(window_stack->task_info->event_queue, &c, 0) != pdTRUE) {
+                    ESP_LOGW(TAG, "Unable to send event to task");
                 }
             }
         }
@@ -600,16 +597,45 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
             managed_framebuffer_t *framebuffer = window_stack->prev; // Start with back window
 
             do {
-                // if (atomic_flag_test_and_set(&framebuffer->clean)) {
-                //    goto next;
-                // }
-
-                // Send events to current window
-
                 changes = true;
 
                 int content_x = framebuffer->x + BORDER_PX;
                 int content_y = framebuffer->y + BORDER_TOP_PX;
+
+                int rotated_w, rotated_h;
+                if (ppa_rotation == PPA_SRM_ROTATION_ANGLE_90 || ppa_rotation == PPA_SRM_ROTATION_ANGLE_270) {
+                    rotated_w = framebuffer->framebuffer.h;
+                    rotated_h = framebuffer->framebuffer.w;
+                } else {
+                    rotated_w = framebuffer->framebuffer.w;
+                    rotated_h = framebuffer->framebuffer.h;
+                }
+
+                if (content_x + rotated_w > FRAMEBUFFER_MAX_W || content_y + rotated_h > FRAMEBUFFER_MAX_H) {
+                    printf(
+                        "ERROR: Window %dx%d at (%d,%d) would exceed screen bounds %dx%d after rotation\n",
+                        rotated_w,
+                        rotated_h,
+                        content_x,
+                        content_y,
+                        FRAMEBUFFER_MAX_W,
+                        FRAMEBUFFER_MAX_H
+                    );
+
+                    // Clamp to screen bounds
+                    if (content_x + rotated_w > FRAMEBUFFER_MAX_W) {
+                        content_x = FRAMEBUFFER_MAX_W - rotated_w;
+                    }
+                    if (content_y + rotated_h > FRAMEBUFFER_MAX_H) {
+                        content_y = FRAMEBUFFER_MAX_H - rotated_h;
+                    }
+                    if (content_x < 0)
+                        content_x = 0;
+                    if (content_y < 0)
+                        content_y = 0;
+
+                    printf("Clamped to (%d,%d)\n", content_x, content_y);
+                }
 
                 int fb_x = 0, fb_y = 0;
                 rotate_coordinates(content_x, content_y, ppa_rotation, &fb_x, &fb_y);
@@ -617,13 +643,32 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                 int final_fb_x = fb_x;
                 int final_fb_y = fb_y;
 
+                // Adjust for rotation anchor point
                 if (ppa_rotation == PPA_SRM_ROTATION_ANGLE_270) {
-                    final_fb_y = fb_y - framebuffer->framebuffer.h + 1;
+                    final_fb_x = fb_x;
+                    final_fb_y = fb_y - rotated_h + 1;
                 } else if (ppa_rotation == PPA_SRM_ROTATION_ANGLE_180) {
-                    final_fb_x = fb_x - framebuffer->framebuffer.w + 1;
-                    final_fb_y = fb_y - framebuffer->framebuffer.h + 1;
+                    final_fb_x = fb_x - rotated_w + 1;
+                    final_fb_y = fb_y - rotated_h + 1;
                 } else if (ppa_rotation == PPA_SRM_ROTATION_ANGLE_90) {
-                    final_fb_x = fb_x - framebuffer->framebuffer.w + 1;
+                    final_fb_x = fb_x - rotated_h + 1;
+                }
+
+                // Final bounds check after adjustment
+                if (final_fb_x < 0 || final_fb_y < 0 || final_fb_x + rotated_w > FRAMEBUFFER_MAX_W ||
+                    final_fb_y + rotated_h > FRAMEBUFFER_MAX_H) {
+
+                    printf(
+                        "ERROR: Final position (%d,%d) with size %dx%d exceeds bounds\n",
+                        final_fb_x,
+                        final_fb_y,
+                        rotated_w,
+                        rotated_h
+                    );
+
+                    // Skip this window or clamp further
+                    framebuffer = framebuffer->prev;
+                    continue;
                 }
 
                 ppa_srm_oper_config_t oper_config = {
@@ -637,14 +682,14 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                     .in.srm_cm         = PPA_SRM_COLOR_MODE_RGB565,
 
                     .out.buffer         = framebuffers[cur_fb],
-                    .out.buffer_size    = FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_H * FRAMEBUFFER_BPP,
+                    .out.buffer_size    = FRAMEBUFFER_BYTES,
                     .out.pic_w          = FRAMEBUFFER_MAX_W,
                     .out.pic_h          = FRAMEBUFFER_MAX_H,
                     .out.block_offset_x = final_fb_x,
                     .out.block_offset_y = final_fb_y,
                     .out.srm_cm         = PPA_SRM_COLOR_MODE_RGB565,
 
-                    .rotation_angle = ppa_rotation,
+                    .rotation_angle = PPA_SRM_ROTATION_ANGLE_90,
                     .scale_x        = 1.0,
                     .scale_y        = 1.0,
                     .rgb_swap       = 0,
@@ -652,13 +697,29 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                     .mode           = PPA_TRANS_MODE_BLOCKING,
                 };
 
-                ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config);
-                esp_cache_msync(framebuffers[cur_fb], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
-                draw_window_box(framebuffer);
-                esp_cache_msync(framebuffers[cur_fb], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+#if 0
+        printf("Compositing %ldx%ld at (%d,%d) -> rotated %dx%d at (%d,%d)\n",
+               framebuffer->framebuffer.w, framebuffer->framebuffer.h,
+               content_x, content_y,
+               rotated_w, rotated_h,
+               final_fb_x, final_fb_y);
+#endif
+
+                esp_err_t ppa_result = ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config);
+                if (ppa_result != ESP_OK) {
+                    printf("PPA operation failed: %s\n", esp_err_to_name(ppa_result));
+                    framebuffer = framebuffer->prev;
+                    continue;
+                }
 
                 xSemaphoreGive(framebuffer->ready);
-                // next:
+
+                // Invalidate caches so windowbox drawing doesn't mess up the screen
+                esp_cache_msync(framebuffers[cur_fb], FRAMEBUFFER_BYTES, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+                draw_window_box(framebuffer);
+                // Make sure that the PPA will see the current frame including our decorations
+                esp_cache_msync(framebuffers[cur_fb], FRAMEBUFFER_BYTES, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
+
                 framebuffer = framebuffer->prev;
             } while (framebuffer != window_stack->prev);
         }
@@ -691,12 +752,13 @@ void compositor_init(char const *lcd_device_name, char const *keyboard_device_na
     lcd_device->_getfb(lcd_device, 1, (void *)&framebuffers[1]);
     lcd_device->_getfb(lcd_device, 2, (void *)&framebuffers[2]);
 
-    memset(framebuffers[0], 0xaa, FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_H * FRAMEBUFFER_BPP);
-    memset(framebuffers[1], 0xaa, FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_H * FRAMEBUFFER_BPP);
-    memset(framebuffers[2], 0xaa, FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_H * FRAMEBUFFER_BPP);
-    esp_cache_msync(framebuffers[0], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-    esp_cache_msync(framebuffers[1], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-    esp_cache_msync(framebuffers[2], 720 * 720 * 2, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+    memset(framebuffers[0], 0xaa, FRAMEBUFFER_BYTES);
+    memset(framebuffers[1], 0xaa, FRAMEBUFFER_BYTES);
+    memset(framebuffers[2], 0xaa, FRAMEBUFFER_BYTES);
+
+    esp_cache_msync(framebuffers[0], FRAMEBUFFER_BYTES, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+    esp_cache_msync(framebuffers[1], FRAMEBUFFER_BYTES, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+    esp_cache_msync(framebuffers[2], FRAMEBUFFER_BYTES, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
 
     cur_fb = 1;
 

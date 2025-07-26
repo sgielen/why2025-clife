@@ -1,0 +1,8 @@
+version: "3.2.18"
+description: SDL3
+url: https://libsdl.org/
+dependencies:
+  idf: ">=5.5.0"
+sbom:
+  supplier: 'Organization: WHY2025 Team:Badge HP van Braam' 
+  originator: 'Organization: SDL Project'

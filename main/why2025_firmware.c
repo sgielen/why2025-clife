@@ -49,11 +49,15 @@
 #include <string.h>
 #include <unistd.h>
 
-extern void        spi_flash_enable_interrupts_caches_and_other_cpu(void);
-extern void        spi_flash_disable_interrupts_caches_and_other_cpu(void);
-extern void        __real_esp_panic_handler(panic_info_t *info);
-static void const *__keep_symbol __attribute__((used)) = &elf_find_sym;
-static char const *TAG                                 = "why2025_main";
+extern void spi_flash_enable_interrupts_caches_and_other_cpu(void);
+extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
+extern void __real_esp_panic_handler(panic_info_t *info);
+extern void SDL_CreateWindow();
+
+static void const *__keep_symbol_elf __attribute__((used)) = &elf_find_sym;
+static void const *__keep_symbol_sdl __attribute__((used)) = &SDL_CreateWindow;
+
+static char const *TAG = "why2025_main";
 
 #if 0
 extern uint8_t const test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
@@ -72,6 +76,9 @@ extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end")
 
 extern uint8_t const framebuffer_test_a_start[] asm("_binary_framebuffer_test_a_elf_start");
 extern uint8_t const framebuffer_test_a_end[] asm("_binary_framebuffer_test_a_elf_end");
+
+extern uint8_t const sdl_test_start[] asm("_binary_sdl_test_elf_start");
+extern uint8_t const sdl_test_end[] asm("_binary_sdl_test_elf_end");
 
 extern FILE  *why_fopen(char const *pathname, char const *mode);
 extern int    why_fseek(FILE *stream, long offset, int whence);
@@ -188,9 +195,10 @@ int app_main(void) {
     argv[1]     = strdup("argv[xxx]");
 
 
-    pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    pid_t pidb = run_task(sdl_test_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    // pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
-    pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    // pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
 #if 0
@@ -202,7 +210,7 @@ int app_main(void) {
 #endif
 
     while (1) {
-        while (get_num_tasks() < 1) {
+        while (get_num_tasks() < 0) {
             sprintf(argv[1], "argv[%d]", 0);
             // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pida);

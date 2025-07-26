@@ -22,6 +22,8 @@
 #define FRAMEBUFFER_MAX_H 720
 #define FRAMEBUFFER_BPP   2 // 16 bits per pixel
 
+#define FRAMEBUFFER_BYTES (FRAMEBUFFER_MAX_W * FRAMEBUFFER_MAX_W * FRAMEBUFFER_BPP)
+
 typedef struct {
     uint32_t  w;
     uint32_t  h;

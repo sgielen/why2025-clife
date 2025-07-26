@@ -34,6 +34,10 @@ include:
   - event.h
   - misc_funcs.h
 
+  # SDL
+  - SDL3/SDL.h
+  - SDL3/SDL_main.h
+
 simple_function:
 # libc.a
   - _ctype_
@@ -884,9 +888,51 @@ simple_function:
   - vaddr_to_paddr
   - event_poll
 
+# SDL3
+  - SDL_CloseJoystick
+  - SDL_CreateRenderer
+  - SDL_CreateWindow
+  - SDL_CreateWindowAndRenderer
+  - SDL_Delay
+  - SDL_DestroyRenderer
+  - SDL_DestroyWindow
+  - SDL_EnterAppMainCallbacks
+  - SDL_FillSurfaceRect
+  - SDL_GetCurrentDisplayMode
+  - SDL_GetDisplayForWindow
+  - SDL_GetError
+  - SDL_GetJoystickID
+  - SDL_GetNumberProperty
+  - SDL_GetPixelFormatDetails
+  - SDL_GetPixelFormatName
+  - SDL_GetPointerProperty
+  - SDL_GetRendererProperties
+  - SDL_GetStringProperty
+  - SDL_GetTicks
+  - SDL_GetWindowSurface
+  - SDL_Init
+  - SDL_Log
+  - SDL_MapSurfaceRGB
+  - SDL_OpenJoystick
+  - SDL_PollEvent
+  - SDL_Quit
+  - SDL_RenderClear
+  - SDL_RenderFillRect
+  - SDL_RenderPresent
+  - SDL_RunApp
+  - SDL_SetAppMetadata
+  - SDL_SetAppMetadataProperty
+  - SDL_SetHint
+  - SDL_SetRenderDrawColor
+  - SDL_UpdateWindowSurface
+  - SDL_calloc
+  - SDL_free
+  - SDL_rand
+
 simple_function_extern:
   - __adddf3
   - __divdf3
+  - __extendsfdf2
   - __fixdfsi
   - __fixunsdfsi
   - __floatsidf

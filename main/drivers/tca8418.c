@@ -140,17 +140,17 @@ event_t scancode_to_event(tca8418_device_t *device, uint8_t scancode) {
 
     key_mod_t mod;
     switch (s) {
-        case KEY_SCANCODE_LSHIFT: mod = KMOD_LSHIFT; break;
-        case KEY_SCANCODE_RSHIFT: mod = KMOD_RSHIFT; break;
-        case KEY_SCANCODE_LCTRL: mod = KMOD_LCTRL; break;
-        case KEY_SCANCODE_RCTRL: mod = KMOD_RCTRL; break;
-        case KEY_SCANCODE_LALT: mod = KMOD_LALT; break;
-        case KEY_SCANCODE_RALT: mod = KMOD_RALT; break;
-        case KEY_SCANCODE_LGUI: mod = KMOD_LGUI; break;
-        default: mod = KMOD_NONE;
+        case KEY_SCANCODE_LSHIFT: mod = BADGEVMS_KMOD_LSHIFT; break;
+        case KEY_SCANCODE_RSHIFT: mod = BADGEVMS_KMOD_RSHIFT; break;
+        case KEY_SCANCODE_LCTRL: mod = BADGEVMS_KMOD_LCTRL; break;
+        case KEY_SCANCODE_RCTRL: mod = BADGEVMS_KMOD_RCTRL; break;
+        case KEY_SCANCODE_LALT: mod = BADGEVMS_KMOD_LALT; break;
+        case KEY_SCANCODE_RALT: mod = BADGEVMS_KMOD_RALT; break;
+        case KEY_SCANCODE_LGUI: mod = BADGEVMS_KMOD_LGUI; break;
+        default: mod = BADGEVMS_KMOD_NONE;
     }
 
-    if (mod != KMOD_NONE) {
+    if (mod != BADGEVMS_KMOD_NONE) {
         if (event.e.keyboard.down) {
             device->mod_state |= mod;
         } else {
@@ -166,7 +166,7 @@ event_t scancode_to_event(tca8418_device_t *device, uint8_t scancode) {
 
     event.e.keyboard.timestamp = (int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec;
     event.e.keyboard.scancode  = s;
-    event.e.keyboard.key       = SCANCODE_TO_KEYCODE(s);
+    event.e.keyboard.key       = BADGEVMS_SCANCODE_TO_KEYCODE(s);
     event.e.keyboard.repeat    = false;
     event.e.keyboard.mod       = device->mod_state;
     event.e.keyboard.text      = keyboard_get_ascii(s, device->mod_state);

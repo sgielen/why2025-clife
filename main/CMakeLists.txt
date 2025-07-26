@@ -20,9 +20,12 @@ idf_component_register(
     INCLUDE_DIRS
 	 ${CMAKE_CURRENT_SOURCE_DIR}/
 	 ${CMAKE_CURRENT_SOURCE_DIR}/../include/badgevms
+	 # We really don't want to include ../include in BadgeVMS itself
+	 ${CMAKE_CURRENT_SOURCE_DIR}/../components/sdl3/SDL3/include
 	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     EMBED_FILES
     	"${CMAKE_BINARY_DIR}/test_elfs/framebuffer_test_a.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/sdl_test.elf"
 #    	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
@@ -35,9 +38,9 @@ idf_component_register(
 	"esp_psram"
 	"esp_tca8418"
 	"fatfs"
+	"hal"
 	"vfs"
         "esp_mm"
-	"hal"
 )
 
 set(TEST_COMPILER ${CMAKE_C_COMPILER})
@@ -91,6 +94,7 @@ endfunction()
 build_test_elf(bench_basic_a test_elf/bench_basic_a.c)
 build_test_elf(bench_basic_b test_elf/bench_basic_b.c)
 build_test_elf(framebuffer_test_a test_elf/framebuffer_test_a.c)
+build_test_elf(sdl_test test_elf/sdl_test.c)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
