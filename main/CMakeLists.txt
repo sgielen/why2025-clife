@@ -2,7 +2,9 @@ idf_component_register(
     SRCS
 	 ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c
 	 "buddy_alloc.c"
-	 "compositor.c"
+	 "compositor/compositor.c"
+	 "compositor/pixel_functions.c"
+	 "compositor/window_decorations.c"
 	 "device.c"
 	 "drivers/fatfs.c"
 	 "drivers/st7703.c"

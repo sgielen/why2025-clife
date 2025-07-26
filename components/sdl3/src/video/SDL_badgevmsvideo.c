@@ -146,10 +146,9 @@ bool BADGEVMS_VideoInit(SDL_VideoDevice *_this)
     printf("BADGEVMS_VideoInit: Starting initialization...\n");
 
     SDL_zero(mode);
-    mode.format = SDL_PIXELFORMAT_BGR565;
-    mode.w = FRAMEBUFFER_MAX_W;
-    mode.h = FRAMEBUFFER_MAX_H;
-    mode.refresh_rate = 60.0f;
+    pixel_format_t tmp;
+    // BadgeVMS pixel formats are the same as SDL3
+    get_screen_info(&mode.w, &mode.h, ((pixel_format_t*)&mode.format), &mode.refresh_rate);
     
     printf("BADGEVMS_VideoInit: Adding display mode %dx%d, format=%s\n", 
            mode.w, mode.h, SDL_GetPixelFormatName(mode.format));

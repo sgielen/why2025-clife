@@ -47,7 +47,7 @@ bool SDL_BADGEVMS_CreateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *wi
     surface = SDL_CreateSurfaceFrom(data->framebuffer->w, data->framebuffer->h, 
                                    surface_format, 
                                    data->framebuffer->pixels, 
-                                   data->framebuffer->w * FRAMEBUFFER_BPP);
+                                   data->framebuffer->w * 2);
     if (!surface) {
         return false;
     }

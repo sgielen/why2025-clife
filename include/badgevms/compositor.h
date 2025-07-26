@@ -17,6 +17,7 @@
 #pragma once
 
 #include "framebuffer.h"
+#include "pixel_formats.h"
 
 #include <stdbool.h>
 
@@ -25,3 +26,5 @@ void           framebuffer_free(framebuffer_t *framebuffer);
 void           framebuffer_post(framebuffer_t *framebuffer, bool block);
 
 void compositor_init(char const *lcd_device, char const *keyboard_device);
+
+void get_screen_info(int *width, int *height, pixel_format_t *format, float *refresh_rate);

@@ -17,11 +17,19 @@
 #pragma once
 
 #include "framebuffer.h"
+#include "memory.h"
+#include "task.h"
 
-#include <stdbool.h>
+typedef struct managed_framebuffer {
+    framebuffer_t       framebuffer;
+    allocation_range_t *pages;
+    size_t              num_pages;
+    uint16_t            x;
+    uint16_t            y;
+    task_info_t        *task_info;
+    atomic_flag         clean;
+    SemaphoreHandle_t   ready;
 
-framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h);
-void           framebuffer_free(framebuffer_t *framebuffer);
-void           framebuffer_post(framebuffer_t *framebuffer, bool block);
-
-void compositor_init(char const *lcd_device, char const *keyboard_device);
+    struct managed_framebuffer *next;
+    struct managed_framebuffer *prev;
+} managed_framebuffer_t;
