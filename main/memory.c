@@ -414,6 +414,18 @@ void IRAM_ATTR framebuffer_map_pages(allocation_range_t *head_range, allocation_
     critical_exit();
 }
 
+void IRAM_ATTR framebuffer_unmap_pages(allocation_range_t *head_range) {
+    critical_enter();
+    allocation_range_t *r      = head_range;
+    uint32_t            mmu_id = why_mmu_hal_get_id_from_target(MMU_TARGET_PSRAM0);
+
+    while (r) {
+        why_mmu_hal_unmap_region(mmu_id, r->vaddr_start, r->size);
+        r = r->next;
+    }
+    critical_exit();
+}
+
 void IRAM_ATTR NOINLINE_ATTR *why_sbrk(intptr_t increment) {
     task_info_t *task_info = get_task_info();
     uintptr_t    old       = task_info->heap_end;

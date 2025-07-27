@@ -75,12 +75,12 @@ extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end")
 extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
 extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end");
 
-extern uint8_t const framebuffer_test_a_start[] asm("_binary_framebuffer_test_a_elf_start");
-extern uint8_t const framebuffer_test_a_end[] asm("_binary_framebuffer_test_a_elf_end");
 
 extern uint8_t const sdl_test_start[] asm("_binary_sdl_test_elf_start");
 extern uint8_t const sdl_test_end[] asm("_binary_sdl_test_elf_end");
 #endif
+extern uint8_t const framebuffer_test_a_start[] asm("_binary_framebuffer_test_a_elf_start");
+extern uint8_t const framebuffer_test_a_end[] asm("_binary_framebuffer_test_a_elf_end");
 extern uint8_t const test_badge_start[] asm("_binary_test_badge_elf_start");
 extern uint8_t const test_badge_end[] asm("_binary_test_badge_elf_end");
 
@@ -145,25 +145,12 @@ int app_main(void) {
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
     while (1) {
-        free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-        ESP_LOGW(
-            TAG,
-            "Free main memory: %zi, free PSRAM pages: %zi/%zi, running processes %u",
-            free_ram,
-            get_free_psram_pages(),
-            get_total_psram_pages(),
-            get_num_tasks()
-        );
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    };
-
-#if 0
-    while (1) {
-        while (get_num_tasks() < 0) {
+        while (get_num_tasks() < 1) {
             sprintf(argv[1], "argv[%d]", 0);
             // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pida);
-            pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+            // pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+            pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pidb);
             // vTaskDelay(500 / portTICK_PERIOD_MS);
         }
@@ -183,6 +170,7 @@ int app_main(void) {
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a);
     //    xTaskCreate(run_elf, "Task2", 4096, test_elf_b_start, 5, &elf_b);
 
+#if 0
     while (1) {
         free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
         ESP_LOGW(TAG, "Free main memory: %zi", free_ram);

@@ -220,7 +220,10 @@ static void task_info_delete(task_info_t *task_info) {
                     case RES_OPEN:
                         // Already handled above
                         break;
-                    case RES_WINDOW: window_destroy(ptr); break;
+                    case RES_WINDOW:
+                        ESP_LOGW(TAG, "Cleaning up window %p", ptr);
+                        window_destroy(ptr);
+                        break;
                     case RES_DEVICE:
                         device_t *dev = (device_t *)ptr;
                         if (dev->_destroy) {
@@ -332,19 +335,23 @@ static void generic_task(void *ti) {
 void task_record_resource_alloc(task_resource_type_t type, void *ptr) {
     task_info_t *task_info = get_task_info();
 
-    khash_insert_unique_ptr(
-        restable,
-        task_info->resources[type],
-        ptr,
-        type,
-        "Attempted allocate already allocated resource"
-    );
+    if (task_info && task_info->pid) {
+        khash_insert_unique_ptr(
+            restable,
+            task_info->resources[type],
+            ptr,
+            type,
+            "Attempted allocate already allocated resource"
+        );
+    }
 }
 
 void task_record_resource_free(task_resource_type_t type, void *ptr) {
     task_info_t *task_info = get_task_info();
 
-    khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
+    if (task_info && task_info->pid) {
+        khash_del_ptr(restable, task_info->resources[type], ptr, "Attempted to free already freed resource");
+    }
 }
 
 pid_t run_task(void *buffer, uint16_t stack_size, task_type_t type, int argc, char *argv[]) {
@@ -567,7 +574,7 @@ void task_init() {
     hades_queue = xQueueCreate(16, sizeof(pid_t));
     // Hades has higher priority than Zeus. This prevents dead tasks from piling up
     // while Zeus tries to spawn new ones
-    create_kernel_task(hades, "Hades", 2048, NULL, 11, &hades_handle, 1);
+    create_kernel_task(hades, "Hades", 3072, NULL, 11, &hades_handle, 1);
 
     ESP_DRAM_LOGI(DRAM_STR("task_init"), "Starting Zeus process");
     zeus_queue = xQueueCreate(16, sizeof(task_info_t *));

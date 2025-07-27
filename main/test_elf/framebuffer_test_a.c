@@ -47,6 +47,9 @@ int main(int argc, char *argv[]) {
             if (e.e.keyboard.scancode == KEY_SCANCODE_TAB) {
                 vis = !vis;
             }
+            if (e.e.keyboard.scancode == KEY_SCANCODE_ESCAPE) {
+                break;
+            }
         }
 
         static uint16_t row_template[FB_WIDTH];
@@ -150,4 +153,5 @@ int main(int argc, char *argv[]) {
             fps_start_time  = current_time;
         }
     }
+    printf("test_framebuffer_a exiting\n");
 }

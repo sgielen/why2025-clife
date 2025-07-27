@@ -168,12 +168,21 @@ framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
 
 void framebuffer_free(framebuffer_t *framebuffer) {
     if (framebuffer) {
+        if (xSemaphoreTake(window_stack_lock, portMAX_DELAY) != pdTRUE) {
+            ESP_LOGE(TAG, "Failed to get window list mutex");
+            abort();
+        }
+
         managed_framebuffer_t *managed_framebuffer = (managed_framebuffer_t *)framebuffer;
         atomic_store_explicit(&managed_framebuffer->active, false, memory_order_release);
 
-        framebuffer_vaddr_deallocate((uintptr_t)managed_framebuffer->framebuffer.pixels);
+        framebuffer_unmap_pages(managed_framebuffer->pages);
         pages_deallocate(managed_framebuffer->pages);
-        free(managed_framebuffer);
+        framebuffer_vaddr_deallocate((uintptr_t)managed_framebuffer->framebuffer.pixels);
+        // framebuffers that can be free'd are all part of a window_t
+        // free(managed_framebuffer);
+
+        xSemaphoreGive(window_stack_lock);
     }
 }
 
@@ -456,12 +465,13 @@ void window_destroy(window_t *window) {
         return;
     }
 
-    remove_window(window);
+    ESP_LOGI(TAG, "Destroying window %p\n", window);
 
+    remove_window(window);
     task_record_resource_free(RES_WINDOW, window);
     vQueueDelete(window->event_queue);
 
-    for (int i = 0; i < window->num_fb; ++i) {
+    for (int i = 0; i < WINDOW_MAX_FRAMEBUFFER; ++i) {
         ESP_LOGV(TAG, "Destroying framebuffer %u for window %p", i, window);
         framebuffer_free((framebuffer_t *)window->framebuffers[i]);
     }

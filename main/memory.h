@@ -78,6 +78,7 @@ void pages_deallocate(allocation_range_t *head_range);
 uintptr_t framebuffer_vaddr_allocate(size_t size, size_t *out_pages);
 void      framebuffer_vaddr_deallocate(uintptr_t start_address);
 void      framebuffer_map_pages(allocation_range_t *head_range, allocation_range_t *tail_range);
+void      framebuffer_unmap_pages(allocation_range_t *head_range);
 size_t    get_free_psram_pages();
 size_t    get_total_psram_pages();
 
