@@ -55,6 +55,43 @@ rotation_angle_t rotation = ROTATION_ANGLE_270;
 #define WINDOW_MAX_W (FRAMEBUFFER_MAX_W - (2 * BORDER_PX) - SIDE_BAR_PX)
 #define WINDOW_MAX_H (FRAMEBUFFER_MAX_H - BORDER_TOP_PX - TOP_BAR_PX)
 
+__attribute__((always_inline)) static inline window_size_t window_clamp_size(window_t *window, window_size_t size) {
+    window_size_t ret;
+
+    size.w = size.w < 0 ? 0 : size.w;
+    size.h = size.h < 0 ? 0 : size.h;
+
+    if (window->flags & WINDOW_FLAG_FULLSCREEN) {
+        ret.w = size.w > FRAMEBUFFER_MAX_W ? FRAMEBUFFER_MAX_W : size.w;
+        ret.h = size.h > FRAMEBUFFER_MAX_H ? FRAMEBUFFER_MAX_H : size.h;
+    } else {
+        ret.w = size.w > WINDOW_MAX_W ? WINDOW_MAX_W : size.w;
+        ret.h = size.h > WINDOW_MAX_H ? WINDOW_MAX_H : size.h;
+    }
+
+    return ret;
+}
+
+__attribute__((always_inline)) static inline window_coords_t
+    window_clamp_position(window_t *window, window_coords_t position) {
+    window_coords_t ret;
+
+    position.x = position.x < 0 ? 0 : position.x;
+    position.y = position.y < 0 ? 0 : position.y;
+
+    if (window->flags & WINDOW_FLAG_FULLSCREEN) {
+        ret.x = 0;
+        ret.y = 0;
+    } else {
+        int max_x = FRAMEBUFFER_MAX_W - (window->size.w + (2 * BORDER_PX)) - 1;
+        int max_y = FRAMEBUFFER_MAX_H - (window->size.h + (BORDER_TOP_PX + BORDER_PX)) - 1;
+        ret.x     = position.x > max_x ? max_x : position.x;
+        ret.y     = position.y > max_y ? max_y : position.y;
+    }
+
+    return ret;
+}
+
 __attribute__((always_inline)) static inline void push_window(window_t *window) {
     if (xSemaphoreTake(window_stack_lock, portMAX_DELAY) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to get window list mutex");
@@ -101,8 +138,9 @@ __attribute__((always_inline)) static inline void remove_window(window_t *window
         goto out;
     }
 
-    next->prev = prev;
-    prev->next = next;
+    next->prev   = prev;
+    prev->next   = next;
+    window_stack = next;
 out:
     xSemaphoreGive(window_stack_lock);
 }
@@ -143,14 +181,14 @@ framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
 
     framebuffer->framebuffer.w      = w;
     framebuffer->framebuffer.h      = h;
-    framebuffer->framebuffer.format = BADGEVMS_PIXELFORMAT_BGR565;
+    framebuffer->framebuffer.format = BADGEVMS_PIXELFORMAT_RGB565;
     // Keep a copy that the user can't easily change
     framebuffer->w                  = w;
     framebuffer->h                  = h;
-    framebuffer->format             = BADGEVMS_PIXELFORMAT_BGR565;
+    framebuffer->format             = BADGEVMS_PIXELFORMAT_RGB565;
     framebuffer->ready              = xSemaphoreCreateBinary();
     atomic_flag_test_and_set(&framebuffer->clean);
-    framebuffer->active = true;
+    atomic_store_explicit(&framebuffer->active, true, memory_order_release);
 
     // vTaskPrioritySet(framebuffer->task_info->handle, TASK_PRIORITY_FOREGROUND);
     ESP_LOGW(
@@ -199,6 +237,22 @@ IRAM_ATTR static bool
     return true;
 }
 
+__attribute__((always_inline)) static inline bool check_occluded(window_t *window) {
+    if (window == window_stack) {
+        // Top window can't be occluded
+        return false;
+    }
+
+    if (window != window_stack) {
+        if (window_stack->flags & WINDOW_FLAG_FULLSCREEN) {
+            // The top window is overtop everything
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
     static ppa_client_handle_t ppa_srm_handle = NULL;
 
@@ -214,7 +268,10 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
     ppa_register_client(&ppa_srm_config, &ppa_srm_handle);
     ppa_client_register_event_callbacks(ppa_srm_handle, &ppa_srm_callbacks);
 
+    bool fn_down = false;
+
     while (1) {
+        bool changes = false;
         xSemaphoreTake(vsync, portMAX_DELAY);
 
         if (xSemaphoreTake(window_stack_lock, portMAX_DELAY) != pdTRUE) {
@@ -225,14 +282,47 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
         event_t c;
         c.type      = EVENT_NONE;
         ssize_t res = keyboard_device->_read(keyboard_device, 0, &c, sizeof(event_t));
+        if (res) {
+            if (c.e.keyboard.scancode == KEY_SCANCODE_FN) {
+                if (c.e.keyboard.down) {
+                    fn_down = true;
+                } else {
+                    fn_down = false;
+                }
+                c.type = EVENT_NONE;
+            }
+        }
 
         if (res && window_stack) {
             ESP_LOGV(TAG, "Got scancode %02X mods %02X", c.e.keyboard.scancode, c.e.keyboard.mod);
             if (c.e.keyboard.scancode == KEY_SCANCODE_TAB && c.e.keyboard.mod & BADGEVMS_KMOD_LALT &&
                 c.e.keyboard.down) {
-                ESP_LOGV(TAG, "ALT-TAB");
+                if (window_stack->next->title) {
+                    ESP_LOGW(TAG, "ALT-TAB switching to window %p (%s)", window_stack->next, window_stack->next->title);
+                } else {
+                    ESP_LOGW(TAG, "ALT-TAB switching to window %p (no title)", window_stack->next);
+                }
                 window_stack = window_stack->next;
                 c.type       = EVENT_NONE;
+            }
+
+            if (fn_down) {
+                if (c.e.keyboard.down) {
+                    window_coords_t cur_pos = window_stack->position;
+                    switch (c.e.keyboard.scancode) {
+                        case KEY_SCANCODE_UP: cur_pos.y -= 10; break;
+                        case KEY_SCANCODE_DOWN: cur_pos.y += 10; break;
+                        case KEY_SCANCODE_LEFT: cur_pos.x -= 10; break;
+                        case KEY_SCANCODE_RIGHT: cur_pos.x += 10; break;
+                        case KEY_SCANCODE_CROSS:
+                            task_info_t *task_info = window_stack->task_info;
+                            vTaskDelete(task_info->handle);
+                            xSemaphoreGive(window_stack_lock);
+                            continue;
+                        default:
+                    }
+                    window_stack->position = window_clamp_position(window_stack, cur_pos);
+                }
             }
 
             if (c.type != EVENT_NONE) {
@@ -242,16 +332,32 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
             }
         }
 
-        bool changes = false;
 
         if (window_stack) {
             window_t *window = window_stack->prev; // Start with back window
-
             do {
-                changes = true;
+                if ((window == window_stack) && (window_stack->flags & WINDOW_FLAG_FULLSCREEN)) {
+                    // A foreground full-screen app gets as much CPU time as it can handle
+                    vTaskPrioritySet(window->task_info->handle, TASK_PRIORITY_FOREGROUND);
+                } else {
+                    vTaskPrioritySet(window->task_info->handle, TASK_PRIORITY);
+                }
+
+                managed_framebuffer_t *framebuffer = window->framebuffers[window->cur_fb];
+
+                if (!framebuffer || (atomic_load_explicit(&framebuffer->active, memory_order_acquire) == false)) {
+                    // Not yet allocated, or in the process of being destroyed
+                    window = window->prev;
+                    continue;
+                }
 
                 int content_x = window->position.x + BORDER_PX;
                 int content_y = window->position.y + BORDER_TOP_PX;
+
+                if (window->flags & WINDOW_FLAG_FULLSCREEN) {
+                    content_x = 0;
+                    content_y = 0;
+                }
 
                 int rotated_w, rotated_h;
                 if (rotation == ROTATION_ANGLE_90 || rotation == ROTATION_ANGLE_270) {
@@ -260,32 +366,6 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                 } else {
                     rotated_w = window->size.w;
                     rotated_h = window->size.h;
-                }
-
-                if (content_x + rotated_w > FRAMEBUFFER_MAX_W || content_y + rotated_h > FRAMEBUFFER_MAX_H) {
-                    printf(
-                        "ERROR: Window %dx%d at (%d,%d) would exceed screen bounds %dx%d after rotation\n",
-                        rotated_w,
-                        rotated_h,
-                        content_x,
-                        content_y,
-                        FRAMEBUFFER_MAX_W,
-                        FRAMEBUFFER_MAX_H
-                    );
-
-                    // Clamp to screen bounds
-                    if (content_x + rotated_w > FRAMEBUFFER_MAX_W) {
-                        content_x = FRAMEBUFFER_MAX_W - rotated_w;
-                    }
-                    if (content_y + rotated_h > FRAMEBUFFER_MAX_H) {
-                        content_y = FRAMEBUFFER_MAX_H - rotated_h;
-                    }
-                    if (content_x < 0)
-                        content_x = 0;
-                    if (content_y < 0)
-                        content_y = 0;
-
-                    printf("Clamped to (%d,%d)\n", content_x, content_y);
                 }
 
                 int fb_x = 0, fb_y = 0;
@@ -309,15 +389,8 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                     ppa_rotation = PPA_SRM_ROTATION_ANGLE_270;
                 }
 
-                managed_framebuffer_t *framebuffer = window->framebuffers[window->cur_fb];
-
-                if (!framebuffer) {
-                    goto skip_draw;
-                }
-
-                if (atomic_load_explicit(&framebuffer->active, memory_order_acquire) == false) {
-                    goto skip_draw;
-                }
+                float scale_x = ((float)window->size.w / (float)framebuffer->w);
+                float scale_y = ((float)window->size.h / (float)framebuffer->h);
 
                 ppa_srm_oper_config_t oper_config = {
                     .in.buffer         = framebuffer->framebuffer.pixels,
@@ -338,39 +411,47 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                     .out.srm_cm         = PPA_SRM_COLOR_MODE_RGB565,
 
                     .rotation_angle = ppa_rotation,
-                    .scale_x        = 1.0,
-                    .scale_y        = 1.0,
-                    .rgb_swap       = 0,
+                    .scale_x        = scale_x,
+                    .scale_y        = scale_y,
+                    .rgb_swap       = (framebuffer->format == BADGEVMS_PIXELFORMAT_RGB565),
                     .byte_swap      = 0,
                     .mode           = PPA_TRANS_MODE_BLOCKING,
                 };
 
-#if 0
-        printf("Compositing %ldx%ld at (%d,%d) -> rotated %dx%d at (%d,%d)\n",
-               framebuffer->framebuffer.w, framebuffer->framebuffer.h,
-               content_x, content_y,
-               rotated_w, rotated_h,
-               final_fb_x, final_fb_y);
-#endif
-
-                esp_err_t ppa_result = ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config);
-                if (ppa_result != ESP_OK) {
-                    printf("PPA operation failed: %s\n", esp_err_to_name(ppa_result));
-                    window = window->prev;
-                    continue;
+                bool needs_redraw = true;
+                bool is_clean     = atomic_flag_test_and_set(&framebuffer->clean);
+                if (check_occluded(window) || is_clean) {
+                    needs_redraw = false;
                 }
 
-                xSemaphoreGive(framebuffer->ready);
-            skip_draw:
-                // Invalidate caches so windowbox drawing doesn't mess up the screen
-                esp_cache_msync(framebuffers[cur_fb], FRAMEBUFFER_BYTES, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
-                draw_window_box(framebuffers[cur_fb], window, window == window_stack);
-                // Make sure that the PPA will see the current frame including our decorations
-                esp_cache_msync(
-                    framebuffers[cur_fb],
-                    FRAMEBUFFER_BYTES,
-                    ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE
-                );
+                if (needs_redraw) {
+                    esp_err_t ppa_result = ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config);
+                    if (ppa_result != ESP_OK) {
+                        printf("PPA operation failed: %s\n", esp_err_to_name(ppa_result));
+                    } else {
+                        changes = true;
+                    }
+                }
+
+                if (!is_clean) {
+                    xSemaphoreGive(framebuffer->ready);
+                }
+
+                if (needs_redraw) {
+                    // No need to resync the framebuffer if nothing changed
+                    // Invalidate caches so windowbox drawing doesn't mess up the screen
+                    esp_cache_msync(framebuffers[cur_fb], FRAMEBUFFER_BYTES, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+                }
+
+                if ((!(window->flags & WINDOW_FLAG_FULLSCREEN)) && needs_redraw) {
+                    draw_window_box(framebuffers[cur_fb], window, window == window_stack);
+                    // Make sure that the PPA will see the current frame including our decorations
+                    esp_cache_msync(
+                        framebuffers[cur_fb],
+                        FRAMEBUFFER_BYTES,
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE
+                    );
+                }
 
                 window = window->prev;
             } while (window != window_stack->prev);
@@ -388,37 +469,8 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
 void get_screen_info(int *width, int *height, pixel_format_t *format, float *refresh_rate) {
     *width        = FRAMEBUFFER_MAX_W;
     *height       = FRAMEBUFFER_MAX_H;
-    *format       = BADGEVMS_PIXELFORMAT_BGR565;
+    *format       = BADGEVMS_PIXELFORMAT_RGB565;
     *refresh_rate = FRAMEBUFFER_MAX_REFRESH;
-}
-
-__attribute__((always_inline)) static inline window_size_t window_clamp_size(window_t *window, window_size_t size) {
-    window_size_t ret;
-
-    if (window->flags & WINDOW_FLAG_FULLSCREEN) {
-        ret.w = size.w > FRAMEBUFFER_MAX_W ? FRAMEBUFFER_MAX_W : size.w;
-        ret.h = size.h > FRAMEBUFFER_MAX_H ? FRAMEBUFFER_MAX_H : size.h;
-    } else {
-        ret.w = size.w > WINDOW_MAX_W ? WINDOW_MAX_W : size.w;
-        ret.h = size.h > WINDOW_MAX_H ? WINDOW_MAX_H : size.h;
-    }
-
-    return ret;
-}
-
-__attribute__((always_inline)) static inline window_coords_t
-    window_clamp_position(window_t *window, window_coords_t position) {
-    window_coords_t ret;
-
-    if (window->flags & WINDOW_FLAG_FULLSCREEN) {
-        ret.x = 0;
-        ret.y = 0;
-    } else {
-        ret.x = (position.x + window->size.w) > FRAMEBUFFER_MAX_W ? 0 : position.x;
-        ret.y = (position.y + window->size.h) > FRAMEBUFFER_MAX_H ? 0 : position.y;
-    }
-
-    return ret;
 }
 
 window_t *window_create(char const *title, window_size_t size, window_flag_t flags) {
@@ -484,6 +536,7 @@ char const *window_title_get(window_t *window) {
 }
 
 void window_title_set(window_t *window, char const *title) {
+    // window->title is either NULL or a string from strndup()
     free(window->title);
     if (title) {
         window->title = strndup(title, 20);
@@ -522,20 +575,27 @@ window_flag_t window_flags_set(window_t *window, window_flag_t flags) {
     return flags;
 }
 
-framebuffer_t *window_framebuffer_allocate(window_handle_t window, window_size_t size, int *num) {
+framebuffer_t *
+    window_framebuffer_allocate(window_handle_t window, pixel_format_t pixel_format, window_size_t size, int *num) {
     if (window->num_fb == WINDOW_MAX_FRAMEBUFFER) {
         ESP_LOGW(TAG, "Window already has the max number of framebuffers");
         return NULL;
     }
 
-    size.w = size.w > window->size.w ? window->size.w : size.w;
-    size.h = size.h > window->size.h ? window->size.h : size.h;
+    size.w = size.w > FRAMEBUFFER_MAX_W ? FRAMEBUFFER_MAX_W : size.w;
+    size.h = size.h > FRAMEBUFFER_MAX_H ? FRAMEBUFFER_MAX_H : size.h;
 
-    size              = window_clamp_size(window, size);
-    framebuffer_t *fb = framebuffer_allocate(size.w, size.h);
+    size                       = window_clamp_size(window, size);
+    framebuffer_t         *fb  = framebuffer_allocate(size.w, size.h);
+    managed_framebuffer_t *mfb = (managed_framebuffer_t *)fb;
     if (!fb) {
         ESP_LOGW(TAG, "Unable to allocate framebuffer");
         return NULL;
+    }
+
+    if (pixel_format == BADGEVMS_PIXELFORMAT_RGB565 || pixel_format == BADGEVMS_PIXELFORMAT_BGR565) {
+        fb->format  = pixel_format;
+        mfb->format = pixel_format;
     }
 
     window->framebuffers[window->num_fb] = (managed_framebuffer_t *)fb;
@@ -581,9 +641,7 @@ void window_framebuffer_update(window_t *window, int num, bool block, window_rec
     }
 
     managed_framebuffer_t *managed_framebuffer = (managed_framebuffer_t *)fb;
-    if (num != window->cur_fb) {
-        window->cur_fb = num;
-    }
+    window->cur_fb                             = num;
 
     atomic_flag_clear(&managed_framebuffer->clean);
 

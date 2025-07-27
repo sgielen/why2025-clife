@@ -34,3 +34,6 @@
     - BadgeVMS uses these functions to allow user programs to access resources
   - Use BadgeVMS malloc/free
   - Use BadgeVMS open/read/write/lseek
+
+* sdl3
+  - Add BadgeVMS video drivers

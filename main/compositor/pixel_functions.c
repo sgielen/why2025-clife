@@ -41,7 +41,7 @@ IRAM_ATTR void draw_pixel_rotated(uint16_t *fb, int x, int y, uint16_t color) {
     if (fb_x >= 0 && fb_x < FRAMEBUFFER_MAX_W && fb_y >= 0 && fb_y < FRAMEBUFFER_MAX_H) {
         fb[fb_y * FRAMEBUFFER_MAX_W + fb_x] = color;
     } else {
-        ESP_LOGE(TAG, "Out of bounds draw: (%d,%d) -> fb(%d,%d)", x, y, fb_x, fb_y);
+        ESP_LOGV(TAG, "Out of bounds draw: (%d,%d) -> fb(%d,%d)", x, y, fb_x, fb_y);
     }
 }
 

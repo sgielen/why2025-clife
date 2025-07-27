@@ -11,18 +11,23 @@
 #include <unistd.h> // for usleep
 
 // Configurable framebuffer dimensions
-#define FB_WIDTH  (720 / 2)
-#define FB_HEIGHT (720 / 2)
+#define FB_WIDTH  (400)
+#define FB_HEIGHT (100)
+#define W_WIDTH   (600)
+#define W_HEIGHT  (600)
 
 int main(int argc, char *argv[]) {
     window_size_t size;
-    size.w = FB_WIDTH;
-    size.h = FB_HEIGHT;
+    size.w = W_WIDTH;
+    size.h = W_HEIGHT;
 
-    window_handle_t window               = window_create("FB test", size, WINDOW_FLAG_NONE);
-    framebuffer_t  *framebuffer          = window_framebuffer_allocate(window, size, NULL);
-    int             frame                = 0;
-    long const      target_frame_time_us = 16667; // 60 FPS in microseconds
+    window_handle_t window = window_create("FB test", size, WINDOW_FLAG_NONE);
+
+    size.w                              = FB_WIDTH;
+    size.h                              = FB_HEIGHT;
+    framebuffer_t *framebuffer          = window_framebuffer_allocate(window, BADGEVMS_PIXELFORMAT_RGB565, size, NULL);
+    int            frame                = 0;
+    long const     target_frame_time_us = 16667; // 60 FPS in microseconds
 
     // FPS tracking variables
     int             frames_rendered = 0;

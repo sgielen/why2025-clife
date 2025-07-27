@@ -396,7 +396,8 @@ pid_t why_getpid(void) {
 
 void why_exit(int status) {
     task_info_t *task_info = get_task_info();
-    vTaskDelete(task_info->handle);
+    ESP_LOGW("exit", "Task %u called exit()", task_info->pid);
+    vTaskDelete(NULL);
 }
 
 DIR *why_opendir(char const *name) {
@@ -409,4 +410,14 @@ int why_closedir(DIR *dirp) {
 
 struct dirent *why_readdir(DIR *dirp) {
     return NULL;
+}
+
+struct _reent *why___getreent(void) {
+    return NULL;
+}
+
+void why_abort(void) {
+    task_info_t *task_info = get_task_info();
+    ESP_LOGW("abort", "Task %u called abort()", task_info->pid);
+    vTaskDelete(NULL);
 }

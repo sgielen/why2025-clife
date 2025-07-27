@@ -42,7 +42,7 @@ bool SDL_BADGEVMS_CreateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *wi
     window_size_t size;
     SDL_GetWindowSizeInPixels(window, &size.w, &size.h);
     int fb_num = 0;
-    framebuffer_t *newfb = window_framebuffer_allocate(data->badgevms_window, size, &fb_num);
+    framebuffer_t *newfb = window_framebuffer_allocate(data->badgevms_window, BADGEVMS_PIXELFORMAT_RGB565, size, &fb_num);
 
     // BadgeVMS pixel formats are the same as this version of SDL
     surface = SDL_CreateSurfaceFrom(newfb->w, newfb->h, newfb->format, newfb->pixels, newfb->w * 2);

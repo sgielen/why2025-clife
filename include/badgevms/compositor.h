@@ -64,8 +64,9 @@ window_size_t window_size_set(window_handle_t window, window_size_t size);
 window_flag_t window_flags_get(window_handle_t window);
 window_flag_t window_flags_set(window_handle_t window, window_flag_t flags);
 
-framebuffer_t *window_framebuffer_allocate(window_handle_t window, window_size_t size, int *num);
-void           window_framebuffer_free(window_handle_t window, int num);
+framebuffer_t  *
+    window_framebuffer_allocate(window_handle_t window, pixel_format_t pixel_format, window_size_t size, int *num);
+void window_framebuffer_free(window_handle_t window, int num);
 framebuffer_t *window_framebuffer_get(window_handle_t window, int num);
 void window_framebuffer_update(window_handle_t window, int num, bool block, window_rect_t *rects, int num_rects);
 

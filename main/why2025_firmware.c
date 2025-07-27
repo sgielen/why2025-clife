@@ -75,10 +75,9 @@ extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end")
 extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
 extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end");
 
-
+#endif
 extern uint8_t const sdl_test_start[] asm("_binary_sdl_test_elf_start");
 extern uint8_t const sdl_test_end[] asm("_binary_sdl_test_elf_end");
-#endif
 extern uint8_t const framebuffer_test_a_start[] asm("_binary_framebuffer_test_a_elf_start");
 extern uint8_t const framebuffer_test_a_end[] asm("_binary_framebuffer_test_a_elf_end");
 extern uint8_t const test_badge_start[] asm("_binary_test_badge_elf_start");
@@ -151,6 +150,7 @@ int app_main(void) {
             // ESP_LOGI(TAG, "Started task with pid %i", pida);
             // pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+            pidb = run_task(sdl_test_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
             // ESP_LOGI(TAG, "Started task with pid %i", pidb);
             // vTaskDelay(500 / portTICK_PERIOD_MS);
         }
