@@ -221,6 +221,13 @@ static void task_info_delete(task_info_t *task_info) {
                         // Already handled above
                         break;
                     case RES_WINDOW: window_destroy(ptr); break;
+                    case RES_DEVICE:
+                        device_t *dev = (device_t *)ptr;
+                        if (dev->_destroy) {
+                            dev->_destroy(ptr);
+                        }
+                        break;
+
                     default: ESP_LOGE(TAG, "Unknown resource type %i in task_info_delete", type);
                 }
             }

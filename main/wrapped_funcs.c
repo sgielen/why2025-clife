@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <iconv.h>
 #include <regex.h>
@@ -130,7 +131,7 @@ int why_atexit(void (*function)(void)) {
 
 void IRAM_ATTR *why_malloc(size_t size) {
     // task_info_t *task_info = get_task_info();
-    //  ESP_LOGI("malloc", "Calling malloc(%zi) from task %d", size, task_info->pid);
+    // ESP_LOGW("malloc", "Calling malloc(%zi) from task %d", size, task_info->pid);
     void *ptr = dlmalloc(size);
 
     // ESP_LOGI("malloc", "Calling malloc(%zi) from task %d, returning %p", size, task_info->pid, ptr);
@@ -391,4 +392,21 @@ out:
 pid_t why_getpid(void) {
     task_info_t *task_info = get_task_info();
     return task_info->pid;
+}
+
+void why_exit(int status) {
+    task_info_t *task_info = get_task_info();
+    vTaskDelete(task_info->handle);
+}
+
+DIR *why_opendir(char const *name) {
+    return NULL;
+}
+
+int why_closedir(DIR *dirp) {
+    return 0;
+}
+
+struct dirent *why_readdir(DIR *dirp) {
+    return NULL;
 }

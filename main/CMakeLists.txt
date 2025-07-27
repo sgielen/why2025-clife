@@ -10,6 +10,7 @@ idf_component_register(
 	 "drivers/st7703.c"
 	 "drivers/tca8418.c"
 	 "drivers/tty.c"
+	 "drivers/badgevms_i2c_bus.c"
 	 "logical_names.c"
 	 "memory.c"
 	 "memory_heap_caps.c"
@@ -26,14 +27,15 @@ idf_component_register(
 	 ${CMAKE_CURRENT_SOURCE_DIR}/../components/sdl3/SDL3/include
 	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     EMBED_FILES
-    	"${CMAKE_BINARY_DIR}/test_elfs/framebuffer_test_a.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/sdl_test.elf"
+#    	"${CMAKE_BINARY_DIR}/test_elfs/framebuffer_test_a.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/sdl_test.elf"
 #    	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_a.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_b.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_basic_c.elf"
 #	"${CMAKE_BINARY_DIR}/test_elfs/test_shell.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_a.elf"
-	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_a.elf"
+#	"${CMAKE_BINARY_DIR}/test_elfs/bench_basic_b.elf"
+	"${CMAKE_BINARY_DIR}/test_elfs/test_badge.elf"
     PRIV_REQUIRES
 	"esp_driver_ppa"
 	"esp_lcd_st7703"
@@ -97,6 +99,7 @@ build_test_elf(bench_basic_a test_elf/bench_basic_a.c)
 build_test_elf(bench_basic_b test_elf/bench_basic_b.c)
 build_test_elf(framebuffer_test_a test_elf/framebuffer_test_a.c)
 build_test_elf(sdl_test test_elf/sdl_test.c)
+build_test_elf(test_badge test_elf/test_badge.c)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated_symbols.c

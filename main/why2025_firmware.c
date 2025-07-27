@@ -22,6 +22,8 @@
 
 #include "compositor/compositor_private.h"
 #include "device.h"
+#include "device_private.h"
+#include "drivers/badgevms_i2c_bus.h"
 #include "drivers/fatfs.h"
 #include "drivers/st7703.h"
 #include "drivers/tca8418.h"
@@ -68,7 +70,6 @@ extern uint8_t const test_elf_c_start[] asm("_binary_test_basic_c_elf_start");
 extern uint8_t const test_elf_c_end[] asm("_binary_test_basic_c_elf_end");
 extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
 extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
-#endif
 extern uint8_t const test_elf_bench_a_start[] asm("_binary_bench_basic_a_elf_start");
 extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end");
 extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
@@ -79,6 +80,9 @@ extern uint8_t const framebuffer_test_a_end[] asm("_binary_framebuffer_test_a_el
 
 extern uint8_t const sdl_test_start[] asm("_binary_sdl_test_elf_start");
 extern uint8_t const sdl_test_end[] asm("_binary_sdl_test_elf_end");
+#endif
+extern uint8_t const test_badge_start[] asm("_binary_test_badge_elf_start");
+extern uint8_t const test_badge_end[] asm("_binary_test_badge_elf_end");
 
 extern FILE  *why_fopen(char const *pathname, char const *mode);
 extern int    why_fseek(FILE *stream, long offset, int whence);
@@ -114,6 +118,7 @@ int app_main(void) {
     device_register("PANEL0", st7703_create());
     device_register("TT01", tty_create(true, true));
     device_register("FLASH0", fatfs_create_spi("FLASH0", "storage", true));
+    device_register("I2CBUS0", badgevms_i2c_bus_create("I2CBUS0", 0, 400 * 1000));
     logical_name_set("SEARCH", "FLASH0:[SUBDIR], FLASH0:[SUBDIR.ANOTHER]", false);
 
     compositor_init("PANEL0", "KEYBOARD0");
@@ -128,87 +133,31 @@ int app_main(void) {
     //    memset(&image, 0, (sizeof image));
     //   image.version = PNG_IMAGE_VERSION;
 
-#if 0
-    int           buf_size   = 720 * 720 * 2;
-    // png_bytep pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
-    lcd_device_t *lcd_device = (lcd_device_t *)device_get("PANEL0");
-    if (lcd_device) {
-        void *pixels;
-        lcd_device->_getfb(lcd_device, &pixels);
-        memset(pixels, 0, buf_size);
-        for (int i = 0; i < buf_size / 2; ++i) {
-            if (i < 720 * (720 / 3)) 
-                ((uint16_t *)pixels)[i] = 0x1F;
-            else if (i < 720 * ((720 / 3) * 2))
-                ((uint16_t *)pixels)[i] = 0x7E0;
-            else 
-                ((uint16_t *)pixels)[i] = 0xF800;
-
-        }
-        lcd_device->_draw(lcd_device, 0, 0, 720, 720, pixels);
-    }
-#endif
-
-#if 0
-    FILE *f = why_fopen("FLASH0:BADGEVMS.PNG", "r");
-    if (f) {
-        why_fseek(f, 0, SEEK_END);
-        long size = why_ftell(f);
-        if (size > 0) {
-            why_fseek(f, 0, SEEK_SET);
-            void *imgbuf = heap_caps_malloc(size, MALLOC_CAP_SPIRAM); 
-            if (imgbuf) {
-                ESP_LOGW(TAG, "Got buffer at %p-%pof size %lu", imgbuf, imgbuf + size, size);
-                size_t s = why_fread(imgbuf, size, 1, f);
-                if (s) {
-                    image.format = PNG_FORMAT_RGB;
-                    png_image_begin_read_from_memory(&image, imgbuf, size);
-                    int stride = PNG_IMAGE_ROW_STRIDE(image);
-                    int buf_size = PNG_IMAGE_SIZE(image);
-                    png_bytep pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
-                    ESP_LOGW(TAG, "Decompressed image is %u bytes", PNG_IMAGE_SIZE(image));
-                    png_image_finish_read(&image, NULL, pixels, stride, NULL);
-                    memset(pixels, 0, buf_size);
-                    for (int i = 0; i < buf_size; i += 3) {
-                        pixels[i] = 0xff;
-                    }
-                    free(imgbuf);
-                    why_fclose(f);
-                    lcd_device_t *lcd_device = (lcd_device_t*)device_get("PANEL0");
-                    lcd_device->_draw(lcd_device, 0, 0, 720, 720, pixels);
-                } else {
-                    ESP_LOGW(TAG, "Read failed: %s", strerror(errno));
-                } 
-            } else {
-                ESP_LOGW(TAG, "Malloc(%lu) failed: %s", size, strerror(errno));
-            }
-        } else {
-            ESP_LOGW(TAG, "fseek/ftell failed");
-        }
-    } else {
-        ESP_LOGW(TAG, "Couldn't open image");
-    }
-#endif
-
     char **argv = malloc(sizeof(char *) * 2);
     argv[0]     = strdup("test_elf_c");
     argv[1]     = strdup("argv[xxx]");
 
 
-    pid_t pidb = run_task(sdl_test_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    pid_t pidb = run_task(test_badge_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
-    pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    // pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
-#if 0
     while (1) {
-        fprintf(stderr, ".");
-        fflush(stderr);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        ESP_LOGW(
+            TAG,
+            "Free main memory: %zi, free PSRAM pages: %zi/%zi, running processes %u",
+            free_ram,
+            get_free_psram_pages(),
+            get_total_psram_pages(),
+            get_num_tasks()
+        );
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     };
-#endif
 
+#if 0
     while (1) {
         while (get_num_tasks() < 0) {
             sprintf(argv[1], "argv[%d]", 0);
@@ -243,6 +192,7 @@ int app_main(void) {
     };
     vTaskDelay(30000 / portTICK_PERIOD_MS);
     esp_restart();
+#endif
 
 #if 0
     vTaskDelay(5000 / portTICK_PERIOD_MS);

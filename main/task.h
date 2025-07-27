@@ -40,7 +40,14 @@ KHASH_MAP_INIT_INT(restable, int);
 #define TASK_PRIORITY            5
 #define TASK_PRIORITY_FOREGROUND 6
 
-typedef enum { RES_ICONV_OPEN, RES_REGCOMP, RES_OPEN, RES_WINDOW, RES_RESOURCE_TYPE_MAX } task_resource_type_t;
+typedef enum {
+    RES_ICONV_OPEN,
+    RES_REGCOMP,
+    RES_OPEN,
+    RES_WINDOW,
+    RES_DEVICE,
+    RES_RESOURCE_TYPE_MAX
+} task_resource_type_t;
 
 typedef enum {
     TASK_TYPE_ELF,
