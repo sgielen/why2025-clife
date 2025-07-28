@@ -34,7 +34,12 @@ This will generate a directory `sdk_dist` with the headers and libraries.
 You then need to use a riscv32 compiler to build for BadgeVMS, one way of doing that is by reusing the `riscv32-esp-elf-*` toolchain that comes with esp-idf, however any riscv32 compiler should work. But only GCC is tested. Example (with esp-idf compilers):
 
 ```
-riscv32-esp-elf-gcc -O2 -fPIC -fdata-sections -ffunction-sections -flto -fno-builtin -fno-builtin-function -fno-jump-tables -fno-tree-switch-conversion -fstrict-volatile-bitfields -fvisibility=hidden -g3 -mabi=ilp32f -march=rv32imafc_zicsr_zifencei -nostartfiles -nostdlib -shared -Wl,--strip-debug -Wl,--gc-sections -e main --sysroot sdk_dist -isystem sdk_dist/include hello.c -o hello.elf
+riscv32-esp-elf-gcc -O2 -fPIC -fdata-sections -ffunction-sections -flto \
+   -fno-builtin -fno-builtin-function -fno-jump-tables -fno-tree-switch-conversion \
+   -fstrict-volatile-bitfields -fvisibility=hidden -g3 -mabi=ilp32f \
+   -march=rv32imafc_zicsr_zifencei -nostartfiles -nostdlib -shared \
+   -Wl,--strip-debug -Wl,--gc-sections -e main --sysroot sdk_dist -isystem sdk_dist/include \
+   hello.c -o hello.elf
 ```
 
 This also works with for instance `riscv64-linux-gnu-gcc` as shipped by Fedora 42.  
