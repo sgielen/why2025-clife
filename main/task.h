@@ -51,7 +51,7 @@ typedef enum {
 
 typedef enum {
     TASK_TYPE_ELF,
-    TASK_TYPE_ELF_ROM,
+    TASK_TYPE_ELF_PATH,
 } task_type_t;
 
 typedef struct {
@@ -79,8 +79,9 @@ typedef struct task_info {
     TaskHandle_t handle;
     khash_t(restable) * resources[RES_RESOURCE_TYPE_MAX];
     allocation_range_t *allocations;
+    void const         *buffer;
     void               *data;
-    char               *buffer;
+    char               *file_path;
     char              **argv;
     char              **argv_back;
     char               *strtok_saveptr;
@@ -90,8 +91,8 @@ typedef struct task_info {
     void (*task_entry)(struct task_info *task_info);
 
     // Small variables
-    bool         buffer_in_rom;
     pid_t        pid;
+    pid_t        parent;
     int          argc;
     int          _errno;
     task_type_t  type;
@@ -114,7 +115,8 @@ __attribute__((always_inline)) inline static task_info_t *get_task_info() {
 }
 
 void         task_init();
-pid_t        run_task(void *buffer, uint16_t stack_size, task_type_t type, int argc, char *argv[]);
+pid_t        run_task(void const *buffer, uint16_t stack_size, task_type_t type, int argc, char *argv[]);
+pid_t        run_task_path(char const *path, uint16_t stack_size, task_type_t type, int argc, char *argv[]);
 void         task_record_resource_alloc(task_resource_type_t type, void *ptr);
 void         task_record_resource_free(task_resource_type_t type, void *ptr);
 uint32_t     get_num_tasks();

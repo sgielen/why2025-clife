@@ -12,7 +12,7 @@
 
 // Configurable framebuffer dimensions
 #define FB_WIDTH  (400)
-#define FB_HEIGHT (100)
+#define FB_HEIGHT (5)
 #define W_WIDTH   (600)
 #define W_HEIGHT  (600)
 

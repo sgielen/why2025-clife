@@ -61,28 +61,6 @@ static void const *__keep_symbol_sdl __attribute__((used)) = &SDL_CreateWindow;
 
 static char const *TAG = "why2025_main";
 
-#if 0
-extern uint8_t const test_elf_a_start[] asm("_binary_test_basic_a_elf_start");
-extern uint8_t const test_elf_a_end[] asm("_binary_test_basic_a_elf_end");
-extern uint8_t const test_elf_b_start[] asm("_binary_test_basic_b_elf_start");
-extern uint8_t const test_elf_b_end[] asm("_binary_test_basic_b_elf_end");
-extern uint8_t const test_elf_c_start[] asm("_binary_test_basic_c_elf_start");
-extern uint8_t const test_elf_c_end[] asm("_binary_test_basic_c_elf_end");
-extern uint8_t const test_elf_shell_start[] asm("_binary_test_shell_elf_start");
-extern uint8_t const test_elf_shell_end[] asm("_binary_test_shell_elf_end");
-extern uint8_t const test_elf_bench_a_start[] asm("_binary_bench_basic_a_elf_start");
-extern uint8_t const test_elf_bench_a_end[] asm("_binary_bench_basic_a_elf_end");
-extern uint8_t const test_elf_bench_b_start[] asm("_binary_bench_basic_b_elf_start");
-extern uint8_t const test_elf_bench_b_end[] asm("_binary_bench_basic_b_elf_end");
-
-#endif
-extern uint8_t const sdl_test_start[] asm("_binary_sdl_test_elf_start");
-extern uint8_t const sdl_test_end[] asm("_binary_sdl_test_elf_end");
-extern uint8_t const framebuffer_test_a_start[] asm("_binary_framebuffer_test_a_elf_start");
-extern uint8_t const framebuffer_test_a_end[] asm("_binary_framebuffer_test_a_elf_end");
-extern uint8_t const test_badge_start[] asm("_binary_test_badge_elf_start");
-extern uint8_t const test_badge_end[] asm("_binary_test_badge_elf_end");
-
 extern FILE  *why_fopen(char const *pathname, char const *mode);
 extern int    why_fseek(FILE *stream, long offset, int whence);
 extern void   why_rewind(FILE *stream);
@@ -124,7 +102,14 @@ int app_main(void) {
 
     printf("BadgeVMS is ready\n");
     free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    ESP_LOGW(TAG, "Free main memory: %zi", free_ram);
+    ESP_LOGW(
+        TAG,
+        "Free main memory: %zi, free PSRAM pages: %zi/%zi, running processes %u",
+        free_ram,
+        get_free_psram_pages(),
+        get_total_psram_pages(),
+        get_num_tasks()
+    );
 
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_a_start, 5, &elf_a);
     //
@@ -136,23 +121,30 @@ int app_main(void) {
     argv[0]     = strdup("test_elf_c");
     argv[1]     = strdup("argv[xxx]");
 
+    pid_t pida, pidb;
 
-    pid_t pidb = run_task(test_badge_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-    // pid_t pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
+    printf("After argv stuff\n");
+    free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    ESP_LOGW(
+        TAG,
+        "Free main memory: %zi, free PSRAM pages: %zi/%zi, running processes %u",
+        free_ram,
+        get_free_psram_pages(),
+        get_total_psram_pages(),
+        get_num_tasks()
+    );
+
+    // pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
     // pidb       = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
 
     while (1) {
         while (get_num_tasks() < 1) {
-            sprintf(argv[1], "argv[%d]", 0);
-            // pid_t pida = run_task(test_elf_bench_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-            // ESP_LOGI(TAG, "Started task with pid %i", pida);
-            // pid_t pidb = run_task(test_elf_bench_b_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-            pidb = run_task(framebuffer_test_a_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-            pidb = run_task(sdl_test_start, 4096, TASK_TYPE_ELF_ROM, 2, argv);
-            // ESP_LOGI(TAG, "Started task with pid %i", pidb);
-            // vTaskDelay(500 / portTICK_PERIOD_MS);
+            // pidb = run_task_path("FLASH0:bench_basic_b.elf", 4096, TASK_TYPE_ELF, 2, argv);
+            // pidb = run_task_path("FLASH0:framebuffer_test_a.elf", 4096, TASK_TYPE_ELF, 2, argv);
+            pidb = run_task_path("FLASH0:hardware_test.elf", 4096, TASK_TYPE_ELF, 2, argv);
+            vTaskDelay(10 / portTICK_PERIOD_MS);
         }
         free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
         ESP_LOGW(
@@ -165,6 +157,8 @@ int app_main(void) {
         );
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+
+    ESP_LOGE(TAG, "How did we get here?");
     // pid_t pidb = run_task(test_elf_b_start, 4096, TASK_TYPE_ELF_ROM, 0, NULL);
     // ESP_LOGI(TAG, "Started task with pid %i", pidb);
     //    xTaskCreate(run_elf, "Task1", 16384, test_elf_shell_start, 5, &elf_a);

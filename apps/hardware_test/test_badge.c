@@ -14,12 +14,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "compositor.h"
-#include "event.h"
-#include "framebuffer.h"
-#include "keyboard.h"
-#include "microui.c"
-#include "microui.h"
+#include "badgevms/compositor.h"
+#include "badgevms/event.h"
+#include "badgevms/framebuffer.h"
+#include "badgevms/keyboard.h"
+#include "thirdparty/microui.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -821,6 +820,8 @@ int main() {
 
     bool       running              = true;
     long const target_frame_time_us = 16667;
+
+    memset(app.fb->pixels, 0x55, 720 * 720 * 2);
 
     render_ui(&app);
     window_framebuffer_update(app.window, fb_num, true, NULL, 0);

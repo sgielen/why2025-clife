@@ -149,6 +149,7 @@ framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
     size_t    num_pages        = 0;
     size_t    framebuffer_size = w * h * FRAMEBUFFER_BPP;
     uintptr_t vaddr_start      = framebuffer_vaddr_allocate(framebuffer_size, &num_pages);
+
     if (!vaddr_start) {
         ESP_LOGE(TAG, "No vaddr space for frame buffer");
         return NULL;
@@ -176,6 +177,7 @@ framebuffer_t *framebuffer_allocate(uint32_t w, uint32_t h) {
         framebuffer->pages,
         tail_range
     );
+
     framebuffer_map_pages(framebuffer->pages, tail_range);
     framebuffer->framebuffer.pixels = (uint16_t *)vaddr_start;
 
@@ -217,8 +219,14 @@ void framebuffer_free(framebuffer_t *framebuffer) {
         framebuffer_unmap_pages(managed_framebuffer->pages);
         pages_deallocate(managed_framebuffer->pages);
         framebuffer_vaddr_deallocate((uintptr_t)managed_framebuffer->framebuffer.pixels);
-        // framebuffers that can be free'd are all part of a window_t
-        // free(managed_framebuffer);
+        bool is_clean = atomic_flag_test_and_set(&managed_framebuffer->clean);
+        if (!is_clean) {
+            // Someone is still waiting on the lock to be released.
+            xSemaphoreGive(managed_framebuffer->ready);
+        }
+
+        vSemaphoreDelete(managed_framebuffer->ready);
+        free(managed_framebuffer);
 
         xSemaphoreGive(window_stack_lock);
     }
@@ -428,6 +436,19 @@ static void IRAM_ATTR NOINLINE_ATTR compositor(void *ignored) {
                     esp_err_t ppa_result = ppa_do_scale_rotate_mirror(ppa_srm_handle, &oper_config);
                     if (ppa_result != ESP_OK) {
                         printf("PPA operation failed: %s\n", esp_err_to_name(ppa_result));
+                        printf(
+                            "Trying: at %ux%u size %ux%u -> %ux%u size %ux%u scale %fx%f\n",
+                            window->position.x,
+                            window->position.y,
+                            window->size.w,
+                            window->size.h,
+                            final_fb_x,
+                            final_fb_y,
+                            framebuffer->w,
+                            framebuffer->h,
+                            scale_x,
+                            scale_y
+                        );
                     } else {
                         changes = true;
                     }
@@ -519,12 +540,14 @@ void window_destroy(window_t *window) {
 
     ESP_LOGI(TAG, "Destroying window %p\n", window);
 
+    // This takes the window_stack lock. So the compositor is not using the window
+    // or the framebuffers once we are done.
     remove_window(window);
     task_record_resource_free(RES_WINDOW, window);
     vQueueDelete(window->event_queue);
 
     for (int i = 0; i < WINDOW_MAX_FRAMEBUFFER; ++i) {
-        ESP_LOGV(TAG, "Destroying framebuffer %u for window %p", i, window);
+        ESP_LOGW(TAG, "Destroying framebuffer %u for window %p", i, window);
         framebuffer_free((framebuffer_t *)window->framebuffers[i]);
     }
     free(window->title);
@@ -641,7 +664,13 @@ void window_framebuffer_update(window_t *window, int num, bool block, window_rec
     }
 
     managed_framebuffer_t *managed_framebuffer = (managed_framebuffer_t *)fb;
-    window->cur_fb                             = num;
+
+    if (atomic_load_explicit(&managed_framebuffer->active, memory_order_acquire) == false) {
+        ESP_LOGW(TAG, "Cannot update framebuffer that is being destroyed");
+        return;
+    }
+
+    window->cur_fb = num;
 
     atomic_flag_clear(&managed_framebuffer->clean);
 

@@ -30,6 +30,7 @@
 #include "hash_helper.h"
 #include "khash.h"
 #include "memory.h"
+#include "why_io.h"
 
 #include <stdatomic.h>
 
@@ -239,9 +240,11 @@ static void task_info_delete(task_info_t *task_info) {
         kh_destroy(restable, task_info->resources[i]);
     }
 
+    free(task_info->file_path);
     free(task_info->argv_back);
     heap_caps_free(task_info->psram);
     free(task_info);
+    ESP_LOGW(TAG, "Cleaned up task");
 }
 
 // Try and handle misbehaving tasks
@@ -302,10 +305,6 @@ static void elf_task(task_info_t *task_info) {
         goto out;
     }
 
-    if (!task_info->buffer_in_rom) {
-        free(task_info->buffer);
-    }
-
     ESP_LOGI(TAG, "Writing back and invalidating our address space");
     writeback_and_invalidate_task(task_info);
 
@@ -317,6 +316,39 @@ static void elf_task(task_info_t *task_info) {
 
 out:
     // All allocations will be cleaned up Hades
+}
+
+// This runs inside the user task
+static void elf_task_path(task_info_t *task_info) {
+    int fd = why_open(task_info->file_path, O_RDONLY, 0);
+    if (fd == -1) {
+        ESP_LOGW("elf_task_path", "Unable to open file");
+        return;
+    }
+
+    off_t size = why_lseek(fd, 0, SEEK_END);
+    // 112 bytes is currently the smallest known ELF :)
+    if (size == -1 || size < 112) {
+        ESP_LOGW("elf_task_path", "Unable to read file");
+        return;
+    }
+
+    why_lseek(fd, 0, SEEK_SET);
+
+    task_info->buffer = dlmalloc(size);
+    if (!task_info->buffer) {
+        ESP_LOGW("elf_task_path", "Unable to allocate memory");
+        return;
+    }
+
+    ssize_t r = why_read(fd, task_info->buffer, size);
+    if (r != size) {
+        ESP_LOGW("elf_task_path", "Unable to read file contents");
+        return;
+    }
+
+    why_close(fd);
+    elf_task(task_info);
 }
 
 // This is the function that runs inside the Task
@@ -354,8 +386,28 @@ void task_record_resource_free(task_resource_type_t type, void *ptr) {
     }
 }
 
-pid_t run_task(void *buffer, uint16_t stack_size, task_type_t type, int argc, char *argv[]) {
-    pid_t pid = pid_allocate();
+pid_t run_task_path(char const *path, uint16_t stack_size, task_type_t type, int argc, char *argv[]) {
+    if (!(type == TASK_TYPE_ELF || type == TASK_TYPE_ELF_PATH)) {
+        ESP_LOGE(TAG, "Can only run ELF non-rom files");
+        return -1;
+    }
+
+    type = TASK_TYPE_ELF_PATH;
+
+    int fd = why_open(path, O_RDONLY, 0);
+    if (fd == -1) {
+        ESP_LOGW(TAG, "Could not open %s", path);
+        return -1;
+    }
+
+    why_close(fd);
+
+    return run_task((void const *)path, stack_size, type, argc, argv);
+}
+
+pid_t run_task(void const *buffer, uint16_t stack_size, task_type_t type, int argc, char *argv[]) {
+    task_info_t *parent_task_info = get_task_info();
+    pid_t        pid              = pid_allocate();
     if (pid <= 0) {
         ESP_LOGW(TAG, "Cannot allocate PID for new task");
         return -1;
@@ -373,12 +425,13 @@ pid_t run_task(void *buffer, uint16_t stack_size, task_type_t type, int argc, ch
     // ESP_LOGI(TAG, "Setting watchpoint on %p core %i", &task_info->pad, esp_cpu_get_core_id());
     // esp_cpu_set_watchpoint(0, &task_info->pad, 4, ESP_CPU_WATCHPOINT_STORE);
 
-    task_info->type          = type;
-    task_info->pid           = pid;
-    task_info->buffer        = buffer;
-    task_info->buffer_in_rom = false;
-    task_info->argc          = argc;
-    task_info->stack_size    = stack_size;
+    task_info->type       = type;
+    task_info->pid        = pid;
+    task_info->parent     = parent_task_info->pid;
+    task_info->buffer     = buffer;
+    task_info->file_path  = NULL;
+    task_info->argc       = argc;
+    task_info->stack_size = stack_size;
 
     // Pack up argv in a nice compact list
     size_t argv_size = argc * sizeof(char *);
@@ -406,9 +459,10 @@ pid_t run_task(void *buffer, uint16_t stack_size, task_type_t type, int argc, ch
 
     switch (type) {
         case TASK_TYPE_ELF: task_info->task_entry = elf_task; break;
-        case TASK_TYPE_ELF_ROM:
-            task_info->task_entry    = elf_task;
-            task_info->buffer_in_rom = true;
+        case TASK_TYPE_ELF_PATH:
+            task_info->file_path  = strdup((char const *)buffer);
+            task_info->buffer     = NULL;
+            task_info->task_entry = elf_task_path;
             break;
         default: ESP_LOGE(TAG, "Unknown task type %i", type); goto error;
     }
@@ -454,8 +508,8 @@ static void IRAM_ATTR hades(void *ignored) {
             task_info_t *task_info = process_table[dead_pid];
             if (task_info) {
                 switch (task_info->type) {
-                    case TASK_TYPE_ELF:
-                    case TASK_TYPE_ELF_ROM: free(task_info->data); break;
+                    case TASK_TYPE_ELF_PATH: // Fallthrough
+                    case TASK_TYPE_ELF: free(task_info->data); break;
                     default: ESP_LOGE(TAG, "Unknown task type %i", task_info->type);
                 }
 
