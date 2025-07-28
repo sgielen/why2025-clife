@@ -177,7 +177,6 @@
 /* #undef HAVE_SA_SIGACTION */
 #define HAVE_ST_MTIM 1
 #define HAVE_SETJMP 1
-/* #undef HAVE_NANOSLEEP */
 #define HAVE_GMTIME_R 1
 #define HAVE_LOCALTIME_R 1
 #define HAVE_NL_LANGINFO 1

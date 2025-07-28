@@ -1,29 +1,27 @@
 cmake_minimum_required(VERSION 3.16)
 
-set(APP_COMPILER ${CMAKE_C_COMPILER})
-if(NOT APP_COMPILER OR APP_COMPILER STREQUAL "")
-    find_program(APP_COMPILER riscv32-esp-elf-gcc REQUIRED)
-endif()
-
-message(STATUS "Building app ELFs with compiler: ${APP_COMPILER}")
+get_property(SDK_LIBRARIES GLOBAL PROPERTY SDK_LIBRARIES)
+set(SDK_LIB_DIR ${CMAKE_BINARY_DIR}/sdk_staging/lib)
+set(SDK_INCLUDE_DIR ${CMAKE_BINARY_DIR}/sdk_staging/include)
 
 set(APP_COMPILE_FLAGS
-    -march=rv32imafc_zicsr_zifencei
-    -mabi=ilp32f
-    -ffunction-sections
+    -O2
+    -fPIC
     -fdata-sections
-    -nostartfiles
+    -ffunction-sections
+    -flto
     -fno-builtin
     -fno-builtin-function
-    -Og
-    -g3
-    -fstrict-volatile-bitfields
     -fno-jump-tables
     -fno-tree-switch-conversion
-    -nostdlib
-    -fPIC
-    -shared
+    -fstrict-volatile-bitfields
     -fvisibility=hidden
+    -g3
+    -mabi=ilp32f
+    -march=rv32imafc_zicsr_zifencei
+    -nostartfiles
+    -nostdlib
+    -shared
 )
 
 set(APP_LINK_FLAGS
@@ -36,14 +34,15 @@ set(APP_ELF_DIR ${CMAKE_BINARY_DIR}/app_elfs)
 file(MAKE_DIRECTORY ${APP_ELF_DIR})
 
 function(build_app app_name)
-    cmake_parse_arguments(APP "" "" "SOURCES" ${ARGN})
-    
+    cmake_parse_arguments(APP "" "" "SOURCES;LIBRARIES" ${ARGN})
+
     if(NOT APP_SOURCES)
         message(FATAL_ERROR "build_app: SOURCES must be specified for ${app_name}")
     endif()
-    
+
     set(APP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
-    
+
+    # Process sources
     set(ABSOLUTE_SOURCES "")
     foreach(SOURCE ${APP_SOURCES})
         if(IS_ABSOLUTE ${SOURCE})
@@ -53,21 +52,38 @@ function(build_app app_name)
         endif()
     endforeach()
 
+    set(LIBRARY_FLAGS "")
+    set(LIBRARY_DEPENDENCIES "")
+    if(APP_LIBRARIES)
+        list(APPEND LIBRARY_FLAGS -L${SDK_LIB_DIR})
+        foreach(LIB ${APP_LIBRARIES})
+            list(APPEND LIBRARY_FLAGS -l${LIB})
+            # This prevents unused symbols from ending up in the final elf
+            list(APPEND LIBRARY_FLAGS -Wl,--exclude-libs,lib${LIB}.a)
+            list(APPEND LIBRARY_DEPENDENCIES ${SDK_LIB_DIR}/lib${LIB}.a)
+        endforeach()
+    endif()
+
     add_custom_command(
         OUTPUT ${APP_ELF_DIR}/${app_name}.elf
-        COMMAND ${APP_COMPILER}
+        COMMAND ${CMAKE_C_COMPILER}
             ${APP_COMPILE_FLAGS}
             ${APP_LINK_FLAGS}
-            -isystem${CMAKE_SOURCE_DIR}/include
-            -I${CMAKE_SOURCE_DIR}/include/badgevms
+            -isystem${SDK_INCLUDE_DIR}
             -o ${APP_ELF_DIR}/${app_name}.elf
             ${ABSOLUTE_SOURCES}
-        DEPENDS ${ABSOLUTE_SOURCES}
+            ${LIBRARY_FLAGS}
+        DEPENDS ${ABSOLUTE_SOURCES} ${LIBRARY_DEPENDENCIES}
         COMMENT "Building app ELF: ${app_name}"
         VERBATIM
     )
 
     add_custom_target(${app_name}_elf ALL DEPENDS ${APP_ELF_DIR}/${app_name}.elf)
+
+    if(APP_LIBRARIES)
+        add_dependencies(${app_name}_elf build_sdk)
+    endif()
+
     set_property(GLOBAL APPEND PROPERTY APP_ELFS ${APP_ELF_DIR}/${app_name}.elf)
 endfunction()
 
@@ -95,4 +111,6 @@ build_app(hardware_test
 build_app(sdl_test
     SOURCES
     sdl_test/sdl_test.c
+    LIBRARIES
+    sdl3
 )

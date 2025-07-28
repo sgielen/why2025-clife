@@ -23,8 +23,6 @@ idf_component_register(
     INCLUDE_DIRS
 	 ${CMAKE_CURRENT_SOURCE_DIR}/
 	 ${CMAKE_CURRENT_SOURCE_DIR}/../include/badgevms
-	 # We really don't want to include ../include in BadgeVMS itself
-	 ${CMAKE_CURRENT_SOURCE_DIR}/../components/sdl3/SDL3/include
 	 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     PRIV_REQUIRES
 	"esp_driver_ppa"

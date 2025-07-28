@@ -26,9 +26,9 @@
 
 #include "../../SDL3/src/video/SDL_sysvideo.h"
 
-#include "compositor.h"
-#include "event.h"
-#include "framebuffer.h"
+#include "badgevms/compositor.h"
+#include "badgevms/event.h"
+#include "badgevms/framebuffer.h"
 
 typedef struct SDL_WindowData
 {

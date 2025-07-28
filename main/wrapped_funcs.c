@@ -39,6 +39,8 @@ extern void spi_flash_disable_interrupts_caches_and_other_cpu(void);
 
 static char const *TAG = "wrapped_functions";
 
+char *why_environ = NULL;
+
 IRAM_ATTR void why_die(char const *reason) {
     esp_system_abort(reason);
 }
@@ -400,6 +402,10 @@ void why_exit(int status) {
     vTaskDelete(NULL);
 }
 
+void why__Exit(int status) {
+    why_exit(status);
+}
+
 DIR *why_opendir(char const *name) {
     return NULL;
 }
@@ -413,7 +419,7 @@ struct dirent *why_readdir(DIR *dirp) {
 }
 
 struct _reent *why___getreent(void) {
-    return NULL;
+    return __getreent();
 }
 
 void why_abort(void) {

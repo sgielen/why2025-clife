@@ -1,4 +1,4 @@
-idf_component_register( SRCS
+set(SDL3_SOURCES
     SDL3/src/SDL.c
     SDL3/src/SDL_assert.c
     SDL3/src/SDL_error.c
@@ -46,18 +46,18 @@ idf_component_register( SRCS
     SDL3/src/events/SDL_touch.c
     SDL3/src/events/imKStoUCS.c
     SDL3/src/filesystem/SDL_filesystem.c
-    SDL3/src/filesystem/dummy/SDL_sysfilesystem.c
-    SDL3/src/filesystem/dummy/SDL_sysfsops.c
+    # SDL3/src/filesystem/dummy/SDL_sysfilesystem.c
+    # SDL3/src/filesystem/dummy/SDL_sysfsops.c
     # SDL3/src/gpu/SDL_gpu.c
     # SDL3/src/hidapi/SDL_hidapi.c
     SDL3/src/io/SDL_asyncio.c
     SDL3/src/io/SDL_iostream.c
-    SDL3/src/joystick/SDL_gamepad.c
+    # SDL3/src/joystick/SDL_gamepad.c
     SDL3/src/joystick/SDL_joystick.c
-    SDL3/src/joystick/SDL_steam_virtual_gamepad.c
-    SDL3/src/joystick/controller_type.c
-    SDL3/src/joystick/dummy/SDL_sysjoystick.c
-    SDL3/src/joystick/virtual/SDL_virtualjoystick.c
+    # SDL3/src/joystick/SDL_steam_virtual_gamepad.c
+    # SDL3/src/joystick/controller_type.c
+    # SDL3/src/joystick/dummy/SDL_sysjoystick.c
+    # SDL3/src/joystick/virtual/SDL_virtualjoystick.c
     SDL3/src/libm/e_atan2.c
     SDL3/src/libm/e_exp.c
     SDL3/src/libm/e_fmod.c
@@ -81,8 +81,8 @@ idf_component_register( SRCS
     SDL3/src/libm/s_scalbn.c
     SDL3/src/libm/s_sin.c
     SDL3/src/libm/s_tan.c
-    # SDL3/src/loadso/dummy/SDL_sysloadso.c
-    # SDL3/src/locale/SDL_locale.c
+    SDL3/src/loadso/dummy/SDL_sysloadso.c
+    SDL3/src/locale/SDL_locale.c
     SDL3/src/locale/dummy/SDL_syslocale.c
     SDL3/src/main/SDL_runapp.c
     SDL3/src/misc/SDL_url.c
@@ -132,6 +132,7 @@ idf_component_register( SRCS
     SDL3/src/stdlib/SDL_crc32.c
     SDL3/src/stdlib/SDL_getenv.c
     SDL3/src/stdlib/SDL_iconv.c
+    SDL3/src/stdlib/SDL_malloc.c
     SDL3/src/stdlib/SDL_memcpy.c
     SDL3/src/stdlib/SDL_memmove.c
     SDL3/src/stdlib/SDL_memset.c
@@ -163,23 +164,16 @@ idf_component_register( SRCS
     src/video/SDL_badgevmsframebuffer.c
     src/video/SDL_badgevmsevents.c
     src/video/SDL_badgevmsvideo.c
-
-    src/SDL_malloc.c
-  
-  PRIV_INCLUDE_DIRS
-    "include"
-    "SDL3/include"
-    "SDL3/src"
-    "SDL3/src/video"
-    "SDL3/include/SDL3"
-    "../../include/badgevms"
 )
 
-target_compile_definitions(${COMPONENT_LIB} PRIVATE
+add_library(sdl3 STATIC ${SDL3_SOURCES})
+
+target_compile_definitions(sdl3 PRIVATE
 )
 
-target_compile_options(${COMPONENT_LIB} PRIVATE
-)
-
-target_link_libraries(${COMPONENT_LIB} INTERFACE
+target_include_directories(sdl3 PRIVATE
+  include
+  SDL3/src
+  SDL3/src/video
+  SDL3/include/SDL3
 )

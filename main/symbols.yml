@@ -35,10 +35,6 @@ include:
   - misc_funcs.h
   - device.h
 
-  # SDL
-  - SDL3/SDL.h
-  - SDL3/SDL_main.h
-
 simple_function:
 # libc.a
   - _ctype_
@@ -380,6 +376,7 @@ simple_function:
 #  - sbrk
 #  - scanf
 #  - seed48
+  - select
 #  - setbuf
 #  - setbuffer
 #  - setenv
@@ -902,67 +899,17 @@ simple_function:
   - window_title_set
   - device_get
 
-# SDL3
-  - SDL_CloseJoystick
-  - SDL_CreateRenderer
-  - SDL_CreateTexture
-  - SDL_CreateWindow
-  - SDL_CreateWindowAndRenderer
-  - SDL_Delay
-  - SDL_DestroyRenderer
-  - SDL_DestroyTexture
-  - SDL_DestroyWindow
-  - SDL_EnterAppMainCallbacks
-  - SDL_FillSurfaceRect
-  - SDL_GetCurrentDisplayMode
-  - SDL_GetDisplayForWindow
-  - SDL_GetError
-  - SDL_GetJoystickID
-  - SDL_GetNumberProperty
-  - SDL_GetPixelFormatDetails
-  - SDL_GetPixelFormatName
-  - SDL_GetPointerProperty
-  - SDL_GetRendererProperties
-  - SDL_GetStringProperty
-  - SDL_GetTicks
-  - SDL_GetWindowID
-  - SDL_GetWindowSurface
-  - SDL_Init
-  - SDL_Log
-  - SDL_MapSurfaceRGB
-  - SDL_OpenJoystick
-  - SDL_PollEvent
-  - SDL_Quit
-  - SDL_RenderClear
-  - SDL_RenderFillRect
-  - SDL_RenderPresent
-  - SDL_RenderTexture
-  - SDL_RenderTextureRotated
-  - SDL_RunApp
-  - SDL_SetAppMetadata
-  - SDL_SetAppMetadataProperty
-  - SDL_SetHint
-  - SDL_SetRenderClipRect
-  - SDL_SetRenderDrawBlendMode
-  - SDL_SetRenderDrawColor
-  - SDL_SetRenderTarget
-  - SDL_SetTextureAlphaMod
-  - SDL_SetTextureBlendMode
-  - SDL_SetWindowSize
-  - SDL_StartTextInput
-  - SDL_UpdateTexture
-  - SDL_UpdateWindowSurface
-  - SDL_calloc
-  - SDL_free
-  - SDL_rand
-
 simple_function_extern:
   - __adddf3
+  - __clzsi2
   - __divdf3
   - __divdi3
+  - __eqdf2
   - __extendsfdf2
+  - __fixdfdi
   - __fixdfsi
   - __fixunsdfsi
+  - __floatdisf
   - __floatsidf
   - __floatunsidf
   - __gtdf2
@@ -994,12 +941,15 @@ simple_function_extern:
   - __riscv_save_7
   - __riscv_save_8
   - __riscv_save_9
+  - __subdf3
+  - __truncdfsf2
   - __udivdi3
   - __umoddi3
 
 simple_object:
 
 wrapped_function:
+  - _Exit
   - asctime
   - atexit
   - calloc
@@ -1076,3 +1026,4 @@ wrapped_object:
   - stdout
   - stderr
   - __errno
+  - environ

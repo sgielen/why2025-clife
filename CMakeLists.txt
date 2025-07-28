@@ -6,6 +6,9 @@ include(ExternalProject)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(why2025_firmware)
+
+add_subdirectory(sdk_libs)
+
 add_subdirectory(apps)
 
 ExternalProject_Add(host_tests
@@ -33,6 +36,7 @@ function(prepare_fatfs_image)
         add_custom_command(
             OUTPUT ${FATFS_STAGING_DIR}/${ELF_NAME}
             COMMAND ${CMAKE_COMMAND} -E copy ${APP_ELF} ${FATFS_STAGING_DIR}/${ELF_NAME}
+            COMMAND ${CMAKE_STRIP} ${FATFS_STAGING_DIR}/${ELF_NAME}
             DEPENDS ${APP_ELF}
             COMMENT "Copying ${ELF_NAME} to fatfs staging"
         )
@@ -46,3 +50,9 @@ prepare_fatfs_image()
 
 fatfs_create_spiflash_image(storage ${FATFS_STAGING_DIR} FLASH_IN_PROJECT PRESERVE_TIME)
 add_dependencies(fatfs_storage_bin prepare_fatfs_staging)
+
+add_custom_target(sdk
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/sdk_staging ${CMAKE_SOURCE_DIR}/sdk_dist
+    DEPENDS build_sdk
+    COMMENT "Creating SDK distribution in sdk_dist/"
+)
