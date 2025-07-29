@@ -4,6 +4,8 @@ dependencies:
   elf_loader:
     version: 1.*
     override_path: ../components/elf_loader
+  esp_driver_ppa:
+    override_path: ../components/esp_driver_ppa
   esp_hw_support:
     override_path: ../components/esp_hw_support
   esp_lcd:
@@ -22,4 +24,5 @@ dependencies:
     version: 1.*
     override_path: ../components/why_stdio
 
-  espressif/libpng: ^1.6.39~1
+  espressif/esp_wifi_remote: ^0.14.4
+  espressif/esp_hosted: '2.0.17'

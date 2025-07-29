@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 int __disable_sanitizer
-__file_str_put_alloc(char c, FILE *stream)
+__why_file_str_put_alloc(char c, FILE *stream)
 {
 	struct __file_str *sstream = (struct __file_str *) stream;
 	if (sstream->pos == sstream->end) {

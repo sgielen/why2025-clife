@@ -4,4 +4,12 @@ menu "ESP PSRAM"
 
     orsource "./$IDF_TARGET/Kconfig.spiram"
 
+    config SPIRAM_TRY_ALLOCATE_WIFI_LWIP
+        bool "Try to allocate memories of WiFi and LWIP in SPIRAM firstly. If failed, allocate internal memory"
+        depends on SPIRAM
+        default "n"
+        help
+            Try to allocate memories of WiFi and LWIP in SPIRAM firstly. If failed, try to allocate internal
+            memory then.
+
 endmenu  # ESP PSRAM

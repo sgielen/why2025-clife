@@ -1,31 +1,99 @@
+/*
+Copyright (c) 1982, 1986, 1993
+The Regents of the University of California.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+3. Neither the name of the University nor the names of its contributors
+may be used to endorse or promote products derived from this software
+without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+ */
 #ifndef _SYS_UNISTD_H
 #define _SYS_UNISTD_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <_ansi.h>
+#include <sys/cdefs.h>
 #define __need_size_t
 #define __need_ptrdiff_t
-#include <sys/cdefs.h>
-#include <sys/types.h>
-#include <sys/_types.h>
+#define __need_NULL
 #include <stddef.h>
+#include <sys/_types.h>
 
+_BEGIN_STD_C
+
+
+#ifndef _USECONDS_T_DECLARED
+typedef	__useconds_t	useconds_t;	/* microseconds (unsigned) */
+#define	_USECONDS_T_DECLARED
+#endif
+
+#ifndef _INTPTR_T_DECLARED
+typedef __intptr_t intptr_t;
+#define _INTPTR_T_DECLARED
+#endif
+
+#ifndef _SSIZE_T_DECLARED
+typedef _ssize_t ssize_t;
+#define	_SSIZE_T_DECLARED
+#endif
+
+#ifndef _OFF_T_DECLARED
+typedef __off_t off_t;
+#define	_OFF_T_DECLARED
+#endif
+
+#ifndef _OFF64_T_DECLARED
+typedef __off64_t       off64_t;        /* 64-bit file offset */
+#define	_OFF64_T_DECLARED
+#endif
+
+#ifndef _UID_T_DECLARED
+typedef	__uid_t		uid_t;		/* user id */
+#define	_UID_T_DECLARED
+#endif
+
+#ifndef _GID_T_DECLARED
+typedef	__gid_t		gid_t;		/* group id */
+#define	_GID_T_DECLARED
+#endif
+
+#ifndef _PID_T_DECLARED
+typedef	__pid_t		pid_t;		/* process id */
+#define	_PID_T_DECLARED
+#endif
 extern char **environ;
 
-void	_exit (int __status) _ATTRIBUTE ((__noreturn__));
+__noreturn void	_exit (int __status);
 
 int	access (const char *__path, int __amode);
 unsigned  alarm (unsigned __secs);
+int     brk(void*);
 int     chdir (const char *__path);
-int     chmod (const char *__path, mode_t __mode);
 int     chown (const char *__path, uid_t __owner, gid_t __group);
 #if __BSD_VISIBLE || (__XSI_VISIBLE >= 4 && __POSIX_VISIBLE < 200112)
 int     chroot (const char *__path);
 #endif
 int     close (int __fildes);
+#if __POSIX_VISIBLE >= 202405
+int	posix_close (int __fildes, int __flag);
+#endif
 #if __POSIX_VISIBLE >= 199209
 size_t	confstr (int __name, char *__buf, size_t __len);
 #endif
@@ -48,7 +116,7 @@ int     dup3 (int __fildes, int __fildes2, int flags);
 int	eaccess (const char *__path, int __mode);
 #endif
 #if __XSI_VISIBLE
-void	encrypt (char *__block, int __edflag);
+void	encrypt (char *, int);
 #endif
 #if __BSD_VISIBLE || (__XSI_VISIBLE && __XSI_VISIBLE < 500)
 void	endusershell (void);
@@ -73,9 +141,6 @@ int	faccessat (int __dirfd, const char *__path, int __mode, int __flags);
 #endif
 #if __BSD_VISIBLE || __XSI_VISIBLE >= 4 || __POSIX_VISIBLE >= 200809
 int     fchdir (int __fildes);
-#endif
-#if __POSIX_VISIBLE >= 199309
-int     fchmod (int __fildes, mode_t __mode);
 #endif
 #if __BSD_VISIBLE || __XSI_VISIBLE >= 4 || __POSIX_VISIBLE >= 200809
 int     fchown (int __fildes, uid_t __owner, gid_t __group);
@@ -176,7 +241,7 @@ int     pipe2 (int __fildes[2], int flags);
 ssize_t pread (int __fd, void *__buf, size_t __nbytes, off_t __offset);
 ssize_t pwrite (int __fd, const void *__buf, size_t __nbytes, off_t __offset);
 #endif
-_READ_WRITE_RETURN_TYPE read (int __fd, void *__buf, size_t __nbyte);
+ssize_t read (int __fd, void *__buf, size_t __nbyte);
 #if __BSD_VISIBLE
 int	rresvport (int *__alport);
 int	revoke (char *__path);
@@ -228,18 +293,12 @@ int 	usleep (useconds_t __useconds);
 #if __BSD_VISIBLE
 int     vhangup (void);
 #endif
-_READ_WRITE_RETURN_TYPE write (int __fd, const void *__buf, size_t __nbyte);
+ssize_t write (int __fd, const void *__buf, size_t __nbyte);
 
-#ifdef __CYGWIN__
-# define __UNISTD_GETOPT__
-# include <getopt.h>
-# undef __UNISTD_GETOPT__
-#else
 extern char *optarg;			/* getopt(3) external variables */
 extern int optind, opterr, optopt;
 int	 getopt(int, char * const [], const char *);
 extern int optreset;			/* getopt(3) external variable */
-#endif
 
 #if __BSD_VISIBLE || (__XSI_VISIBLE >= 4 && __POSIX_VISIBLE < 200809)
 pid_t   vfork (void);
@@ -248,21 +307,18 @@ pid_t   vfork (void);
 #ifdef _LIBC
 /* Provide prototypes for most of the _<systemcall> names that are
    provided in newlib for some compilers.  */
-int     _close (int __fildes);
-pid_t   _fork (void);
-pid_t   _getpid (void);
-int	_isatty (int __fildes);
-int     _link (const char *__path1, const char *__path2);
-_off_t   _lseek (int __fildes, _off_t __offset, int __whence);
-#ifdef __LARGE64_FILES
-_off64_t _lseek64 (int __filedes, _off64_t __offset, int __whence);
+int     close (int __fildes);
+pid_t   fork (void);
+pid_t   getpid (void);
+int	isatty (int __fildes);
+int     link (const char *__path1, const char *__path2);
+_off_t  lseek (int __fildes, _off_t __offset, int __whence);
+void *  sbrk (ptrdiff_t __incr);
+int     unlink (const char *__path);
 #endif
-_READ_WRITE_RETURN_TYPE _read (int __fd, void *__buf, size_t __nbyte);
-void *  _sbrk (ptrdiff_t __incr);
-int     _unlink (const char *__path);
-_READ_WRITE_RETURN_TYPE _write (int __fd, const void *__buf, size_t __nbyte);
-int     _execve (const char *__path, char * const __argv[], char * const __envp[]);
-int     _getentropy (void *buf, size_t buflen);
+
+#if __LARGEFILE64_VISIBLE
+_off64_t lseek64 (int __filedes, _off64_t __offset, int __whence);
 #endif
 
 #if !defined(__INSIDE_CYGWIN__)
@@ -316,12 +372,29 @@ int	unlinkat (int, const char *, int);
 # define	SEEK_SET	0
 # define	SEEK_CUR	1
 # define	SEEK_END	2
+#if __GNU_VISIBLE || __POSIX_VISIBLE >= 202405
+# define	SEEK_DATA	3
+# define	SEEK_HOLE	4
+#endif
 
 #include <sys/features.h>
 
 #define STDIN_FILENO    0       /* standard input file descriptor */
 #define STDOUT_FILENO   1       /* standard output file descriptor */
 #define STDERR_FILENO   2       /* standard error file descriptor */
+
+#ifndef _POSIX2_RE_DUP_MAX
+/* The maximum number of repeated occurrences of a regular expression
+ *    permitted when using the interval notation `\{M,N\}'.  */
+#define _POSIX2_RE_DUP_MAX              255
+#endif /* _POSIX2_RE_DUP_MAX  */
+
+/*
+ * Flag values for posix_close per IEEE Std 1003.1, 2024 Edition
+ */
+#if __POSIX_VISIBLE >= 202405
+#define POSIX_CLOSE_RESTART	1
+#endif
 
 /*
  *  sysconf values per IEEE Std 1003.1, 2008 Edition
@@ -508,13 +581,6 @@ int	unlinkat (int, const char *, int);
 #define _PC_REC_MIN_XFER_SIZE            18
 #define _PC_REC_XFER_ALIGN               19
 #define _PC_TIMESTAMP_RESOLUTION         20
-#ifdef __CYGWIN__
-/* Ask for POSIX permission bits support. */
-#define _PC_POSIX_PERMISSIONS            90
-/* Ask for full POSIX permission support including uid/gid settings. */
-#define _PC_POSIX_SECURITY               91
-#define _PC_CASE_INSENSITIVE             92
-#endif
 
 /*
  *  confstr values per IEEE Std 1003.1, 2004 Edition
@@ -576,9 +642,7 @@ int	unlinkat (int, const char *, int);
 #define _CS_LFS_LINTFLAGS                     24
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+_END_STD_C
 
 #if __SSP_FORTIFY_LEVEL > 0
 #include <ssp/unistd.h>

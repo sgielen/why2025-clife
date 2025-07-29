@@ -105,16 +105,16 @@ struct __file_str {
 };
 
 int
-__file_str_get(FILE *stream);
+__why_file_str_get(FILE *stream);
 
 int
 __file_wstr_get(FILE *stream);
 
 int
-__file_str_put(char c, FILE *stream);
+__why_file_str_put(char c, FILE *stream);
 
 int
-__file_str_put_alloc(char c, FILE *stream);
+__why_file_str_put_alloc(char c, FILE *stream);
 
 extern const char __match_inf[];
 extern const char __match_inity[];
@@ -136,7 +136,7 @@ bool __matchcaseprefix(const char *input, const char *pattern);
 #define FDEV_SETUP_STRING_READ(_s) {		\
 		.file = {			\
 			.flags = __SRD,		\
-                        .get = __file_str_get,  \
+                        .get = __why_file_str_get,  \
                         __LOCK_INIT_NONE        \
 		},				\
 		.pos = (char *) (_s)		\
@@ -158,7 +158,7 @@ bool __matchcaseprefix(const char *input, const char *pattern);
 #define FDEV_SETUP_STRING_WRITE(_s, _end) {	\
 		.file = {			\
 			.flags = __SWR,		\
-			.put = __file_str_put,	\
+			.put = __why_file_str_put,	\
                         __LOCK_INIT_NONE        \
 		},				\
 		.pos = (_s),			\
@@ -168,7 +168,7 @@ bool __matchcaseprefix(const char *input, const char *pattern);
 #define FDEV_SETUP_STRING_ALLOC() {  \
 		.file = {			\
 			.flags = __SWR,		\
-			.put = __file_str_put_alloc,	\
+			.put = __why_file_str_put_alloc,	\
                         __LOCK_INIT_NONE        \
 		},				\
 		.pos = NULL,			\
@@ -180,7 +180,7 @@ bool __matchcaseprefix(const char *input, const char *pattern);
 #define FDEV_SETUP_STRING_ALLOC_BUF(_buf, _size) {  \
 		.file = {			\
 			.flags = __SWR,		\
-			.put = __file_str_put_alloc,	\
+			.put = __why_file_str_put_alloc,	\
                         __LOCK_INIT_NONE        \
 		},				\
 		.pos = _buf,			\

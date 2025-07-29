@@ -501,8 +501,8 @@ simple_function:
 #  - valloc
 #  - vasiprintf
 #  - vasniprintf
-  - vasnprintf
-  - vasprintf
+#  - vasnprintf
+#  - vasprintf
 #  - vdiprintf
 #  - vdprintf
 #  - vfiprintf
@@ -517,14 +517,14 @@ simple_function:
 #  - viscanf
 #  - vprintf
 #  - vscanf
-  - vsiprintf
-  - vsiscanf
-  - vsniprintf
-  - vsnprintf
-  - vsprintf
-  - vsscanf
-  - vswprintf
-  - vswscanf
+#  - vsiprintf
+#  - vsiscanf
+#  - vsniprintf
+#  - vsnprintf
+#  - vsprintf
+#  - vsscanf
+#  - vswprintf
+#  - vswscanf
 #  - vwprintf
 #  - vwscanf
 #  - wait
@@ -987,8 +987,10 @@ wrapped_function:
   - localtime
   - lseek
   - malloc
+  - mkdir
   - open
   - printf
+  - putchar
   - puts
   - rand
   - random
@@ -997,6 +999,8 @@ wrapped_function:
   - reallocarray
   - regcomp
   - regfree
+  - remove
+  - rename
   - scanf
   - setbuf
   - setbuffer
@@ -1008,9 +1012,13 @@ wrapped_function:
   - strerror
   - strndup
   - strtok
+  - system
   - tcgetattr
   - tcsetattr
+  - vfprintf
   - vfscanf
+  - vsnprintf
+  - vsprintf
   - wcsdup
   - write
 
@@ -1018,7 +1026,6 @@ wrapped_function:
   - closedir
   - readdir
 
-  - __getreent
   - abort
 
 wrapped_object:

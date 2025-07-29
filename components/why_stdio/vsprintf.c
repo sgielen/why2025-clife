@@ -32,12 +32,12 @@
 #include "stdio_private.h"
 
 int
-vsprintf(char *s, const char *fmt, va_list ap)
+why_vsprintf(char *s, const char *fmt, va_list ap)
 {
         struct __file_str f = FDEV_SETUP_STRING_WRITE(s, NULL);
 	int i;
 
-	i = vfprintf(&f.file, fmt, ap);
+	i = why_vfprintf(&f.file, fmt, ap);
 	if (i >= 0)
 		s[i] = 0;
 

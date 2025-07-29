@@ -1,3 +1,4 @@
+/* Copyright (c) 2017 Yaakov Selkowitz <yselkowi@redhat.com> */
 #ifndef _SSP_WCHAR_H_
 #define _SSP_WCHAR_H_
 
@@ -32,7 +33,7 @@ __ssp_decl(wchar_t *, fun, (wchar_t *__restrict __buf, const wchar_t *__restrict
   return __ssp_real_(fun) (__buf, __src); \
 }
 
-__BEGIN_DECLS
+_BEGIN_STD_C
 #if __POSIX_VISIBLE >= 200809
 __ssp_bos_wicheck2_restrict(wcpcpy)
 __ssp_bos_wicheck3_restrict(wcpncpy)
@@ -91,7 +92,7 @@ __ssp_decl(wchar_t *, fgetws_unlocked, (wchar_t *__buf, int __wlen, __FILE *__fp
 }
 #endif /* __GNU_VISIBLE */
 
-__END_DECLS
+_END_STD_C
 
 #endif /* __SSP_FORTIFY_LEVEL > 0 */
 #endif /* _SSP_WCHAR_H_ */

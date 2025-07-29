@@ -34,23 +34,23 @@
 #undef putchar
 
 int
-putchar(int c)
+why_putchar(int c)
 {
 	return putc(c, stdout);
 }
 
-#undef putchar_unlocked
+#undef why_putchar_unlocked
 #ifdef __STDIO_LOCKING
 
 int
-putchar_unlocked(int c)
+why_putchar_unlocked(int c)
 {
         return putc_unlocked(c, stdout);
 }
 #else
 #ifdef __strong_reference
-__strong_reference(putchar, putchar_unlocked);
+__strong_reference(why_putchar, why_putchar_unlocked);
 #else
-int putchar_unlocked(int c) { return putchar(c); }
+int why_putchar_unlocked(int c) { return why_putchar(c); }
 #endif
 #endif

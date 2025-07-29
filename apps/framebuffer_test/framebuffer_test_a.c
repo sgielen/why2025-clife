@@ -11,10 +11,10 @@
 #include <unistd.h> // for usleep
 
 // Configurable framebuffer dimensions
-#define FB_WIDTH  (400)
-#define FB_HEIGHT (5)
-#define W_WIDTH   (600)
-#define W_HEIGHT  (600)
+#define FB_WIDTH  (360)
+#define FB_HEIGHT (360)
+#define W_WIDTH   (360)
+#define W_HEIGHT  (360)
 
 int main(int argc, char *argv[]) {
     window_size_t size;

@@ -60,20 +60,6 @@ typedef struct {
     device_t *device;
 } file_handle_t;
 
-typedef struct task_info_psram {
-    // Buffers
-    file_handle_t file_handles[MAXFD];
-    char          strerror_buf[STRERROR_BUFLEN];
-    char          asctime_buf[26];
-    char          ctime_buf[26];
-
-    // Structured
-    struct tm            gmtime_tm;
-    struct tm            localtime_tm;
-    struct malloc_state  malloc_state;
-    struct malloc_params malloc_params;
-} task_info_psram_t;
-
 typedef struct task_info {
     // Pointers
     TaskHandle_t handle;
@@ -104,7 +90,18 @@ typedef struct task_info {
     size_t       current_files;
     unsigned int seed;
 
-    task_info_psram_t *psram;
+    // Buffers
+    file_handle_t file_handles[MAXFD];
+    char          strerror_buf[STRERROR_BUFLEN];
+    char          asctime_buf[26];
+    char          ctime_buf[26];
+
+    // Structured
+    struct tm            gmtime_tm;
+    struct tm            localtime_tm;
+    struct malloc_state  malloc_state;
+    struct malloc_params malloc_params;
+
     void              *pad; // For debugging
 } task_info_t;
 

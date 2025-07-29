@@ -32,7 +32,7 @@
 #include "stdio_private.h"
 
 int
-puts(const char *str)
+why_puts(const char *str)
 {
         int (*put)(char, struct __file *);
 	char c;

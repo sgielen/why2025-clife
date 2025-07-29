@@ -32,9 +32,9 @@ idf_component_register( SRCS
   #fgetwc.c
   #fgetws.c
   fileno.c
-  #filestrget.c
-  #filestrputalloc.c
-  #filestrput.c
+  filestrget.c
+  filestrputalloc.c
+  filestrput.c
   #filewstrget.c
   #flockfile.c
   #fmemopen.c
@@ -73,8 +73,8 @@ idf_component_register( SRCS
   #mktemp.c
   #perror.c
   printf.c
-  #putchar.c
-  #puts.c
+  putchar.c
+  puts.c
   #putwchar.c
   #remove.c
   #rewind.c
@@ -134,8 +134,8 @@ idf_component_register( SRCS
   #vfwscanf.c
   #vprintf.c
   #vscanf.c
-  #vsnprintf.c
-  #vsprintf.c
+  vsnprintf.c
+  vsprintf.c
   #vsscanf.c
   #vswprintf.c
   #vswscanf.c

@@ -45,11 +45,9 @@ extern void __real_xt_unhandled_exception(void *frame);
 
 static char const *TAG = "task";
 
-IRAM_ATTR static task_info_psram_t kernel_task_psram;
-IRAM_ATTR static task_info_t       kernel_task = {
+IRAM_ATTR task_info_t       kernel_task = {
           .heap_start = KERNEL_HEAP_START,
           .heap_end   = KERNEL_HEAP_START,
-          .psram      = &kernel_task_psram,
 };
 
 typedef struct {
@@ -155,26 +153,19 @@ void vTaskPreDeletionHook(TaskHandle_t handle) {
 }
 
 static task_info_t *task_info_init() {
-    task_info_t *task_info = calloc(1, sizeof(task_info_t));
+    task_info_t *task_info = heap_caps_calloc(1, sizeof(task_info_t), MALLOC_CAP_SPIRAM);
     if (!task_info) {
         ESP_LOGE(TAG, "Out of memory trying to allocate task info");
         return NULL;
     }
 
-    task_info->psram = heap_caps_calloc(1, sizeof(task_info_psram_t), MALLOC_CAP_SPIRAM);
-    if (!task_info->psram) {
-        ESP_LOGE(TAG, "Out of memory trying to allocate task info");
-        free(task_info);
-        return NULL;
-    }
-
     task_info->current_files                  = 3;
-    task_info->psram->file_handles[0].is_open = true;
-    task_info->psram->file_handles[0].device  = device_get("TT01");
-    task_info->psram->file_handles[1].is_open = true;
-    task_info->psram->file_handles[1].device  = device_get("TT01");
-    task_info->psram->file_handles[2].is_open = true;
-    task_info->psram->file_handles[2].device  = device_get("TT01");
+    task_info->file_handles[0].is_open = true;
+    task_info->file_handles[0].device  = device_get("TT01");
+    task_info->file_handles[1].is_open = true;
+    task_info->file_handles[1].device  = device_get("TT01");
+    task_info->file_handles[2].is_open = true;
+    task_info->file_handles[2].device  = device_get("TT01");
 
     for (int i = 0; i < RES_RESOURCE_TYPE_MAX; ++i) {
         task_info->resources[i] = kh_init(restable);
@@ -192,12 +183,12 @@ static void task_info_delete(task_info_t *task_info) {
 
     for (int i = 0; i < MAXFD; ++i) {
         // We sadly can't reuse the why_close code as it must be ran from inside the user task
-        if (task_info->psram->file_handles[i].is_open) {
+        if (task_info->file_handles[i].is_open) {
             ESP_LOGI(TAG, "Cleaning up open filehandle %i", i);
-            if (task_info->psram->file_handles[i].device->_close) {
-                task_info->psram->file_handles[i].device->_close(
-                    task_info->psram->file_handles[i].device,
-                    task_info->psram->file_handles[i].dev_fd
+            if (task_info->file_handles[i].device->_close) {
+                task_info->file_handles[i].device->_close(
+                    task_info->file_handles[i].device,
+                    task_info->file_handles[i].dev_fd
                 );
             }
         }
@@ -242,8 +233,7 @@ static void task_info_delete(task_info_t *task_info) {
 
     free(task_info->file_path);
     free(task_info->argv_back);
-    heap_caps_free(task_info->psram);
-    free(task_info);
+    heap_caps_free(task_info);
     ESP_LOGW(TAG, "Cleaned up task");
 }
 

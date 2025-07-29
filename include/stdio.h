@@ -1,154 +1,336 @@
-/*
- * Copyright (c) 1990 The Regents of the University of California.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * and/or other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the University of California, Berkeley.  The name of the
- * University may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- *	@(#)stdio.h	5.3 (Berkeley) 3/15/86
- */
+/* Copyright (c) 2002, 2005, 2007 Joerg Wunsch
+   All rights reserved.
 
-/*
- * NB: to fit things in six character monocase externals, the
- * stdio code uses the prefix `__s' for stdio objects, typically
- * followed by a three-character attempt at a mnemonic.
- */
+   Portions of documentation Copyright (c) 1990, 1991, 1993
+   The Regents of the University of California.
+
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in
+     the documentation and/or other materials provided with the
+     distribution.
+
+   * Neither the name of the copyright holders nor the names of
+     contributors may be used to endorse or promote products derived
+     from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  POSSIBILITY OF SUCH DAMAGE.
+
+  $Id: stdio.h 2527 2016-10-27 20:41:22Z joerg_wunsch $
+*/
 
 #ifndef _STDIO_H_
-#define	_STDIO_H_
+#define	_STDIO_H_ 1
 
-#include "_ansi.h"
-
-#define	_FSTDIO			/* ``function stdio'' */
-
-#define __need_size_t
-#define __need_NULL
 #include <sys/cdefs.h>
+#define __need_NULL
+#define __need_size_t
 #include <stddef.h>
-
-/* typedef only __gnuc_va_list, used throughout the header */
 #define __need___va_list
 #include <stdarg.h>
-
-/* typedef va_list only when required */
-#if __POSIX_VISIBLE >= 200809 || __XSI_VISIBLE
-#ifdef __GNUC__
-#ifndef _VA_LIST_DEFINED
-typedef __gnuc_va_list va_list;
-#define _VA_LIST_DEFINED
-#endif
-#else /* !__GNUC__ */
-#include <stdarg.h>
-#endif
-#endif /* __POSIX_VISIBLE >= 200809 || __XSI_VISIBLE */
-
-/*
- * <sys/reent.h> defines __FILE, _fpos_t.
- * They must be defined there because struct _reent needs them (and we don't
- * want reent.h to include this file.
- */
-
-#include <sys/reent.h>
+#include <sys/lock.h>
 #include <sys/_types.h>
 
 _BEGIN_STD_C
 
-#if !defined(__FILE_defined)
-typedef __FILE FILE;
-# define __FILE_defined
+#if !((defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) || \
+     (defined(__cplusplus) && __cplusplus >= 201402L))
+     //Provide this function for applications which use an earlier C standard before C11 and C++14
+     #define _PICOLIBC_USE_DEPRECATED_GETS
 #endif
-
-typedef _fpos_t fpos_t;
-#ifdef __LARGE64_FILES
-typedef _fpos64_t fpos64_t;
-#endif
-
-#ifndef _OFF_T_DECLARED
-typedef __off_t off_t;
-#define	_OFF_T_DECLARED
-#endif
-
-#ifndef _SSIZE_T_DECLARED
-typedef _ssize_t ssize_t;
-#define	_SSIZE_T_DECLARED
-#endif
-
-#include <sys/stdio.h>
-
-#define	__SLBF	0x0001		/* line buffered */
-#define	__SNBF	0x0002		/* unbuffered */
-#define	__SRD	0x0004		/* OK to read */
-#define	__SWR	0x0008		/* OK to write */
-	/* RD and WR are never simultaneously asserted */
-#define	__SRW	0x0010		/* open for reading & writing */
-#define	__SEOF	0x0020		/* found EOF */
-#define	__SERR	0x0040		/* found error */
-#define	__SMBF	0x0080		/* _buf is from malloc */
-#define	__SAPP	0x0100		/* fdopen()ed in append mode - so must  write to end */
-#define	__SSTR	0x0200		/* this is an sprintf/snprintf string */
-#define	__SOPT	0x0400		/* do fseek() optimisation */
-#define	__SNPT	0x0800		/* do not do fseek() optimisation */
-#define	__SOFF	0x1000		/* set iff _offset is in fact correct */
-#define	__SORD	0x2000		/* true => stream orientation (byte/wide) decided */
-#if defined(__CYGWIN__)
-#  define __SCLE  0x4000        /* convert line endings CR/LF <-> NL */
-#endif
-#define	__SL64	0x8000		/* is 64-bit offset large file */
-
-/* _flags2 flags */
-#define	__SNLK  0x0001		/* stdio functions do not lock streams themselves */
-#define	__SWID	0x2000		/* true => stream orientation wide, false => byte, only valid if __SORD in _flags is true */
 
 /*
- * The following three definitions are for ANSI C, which took them
- * from System V, which stupidly took internal interface macros and
- * made them official arguments to setvbuf(), without renaming them.
- * Hence, these ugly _IOxxx names are *supposed* to appear in user code.
- *
- * Although these happen to match their counterparts above, the
- * implementation does not rely on that (so these could be renumbered).
+ * This is an internal structure of the library that is subject to be
+ * changed without warnings at any time.  Please do *never* reference
+ * elements of it beyond by using the official interfaces provided.
  */
+
+#ifdef __ATOMIC_UNGETC
+#if defined(__riscv) || defined(__MICROBLAZE__) || (__loongarch__)
+/*
+ * Use 32-bit ungetc storage when doing atomic ungetc on RISC-V and
+ * MicroBlaze, which have 4-byte swap intrinsics but not 2-byte swap
+ * intrinsics. This increases the size of the __file struct by four
+ * bytes.
+ */
+#define __PICOLIBC_UNGETC_SIZE	4
+#endif
+#endif
+
+#ifndef __PICOLIBC_UNGETC_SIZE
+#define __PICOLIBC_UNGETC_SIZE	2
+#endif
+
+#if __PICOLIBC_UNGETC_SIZE == 4
+typedef __uint32_t __ungetc_t;
+#endif
+
+#if __PICOLIBC_UNGETC_SIZE == 2
+typedef __uint16_t __ungetc_t;
+#endif
+
+struct __file {
+	__ungetc_t unget;	/* ungetc() buffer */
+	__uint8_t  flags;	/* flags, see below */
+#define __SRD	0x0001		/* OK to read */
+#define __SWR	0x0002		/* OK to write */
+#define __SERR	0x0004		/* found error */
+#define __SEOF	0x0008		/* found EOF */
+#define __SCLOSE 0x0010		/* struct is __file_close */
+#define __SEXT  0x0020          /* struct is __file_ext */
+#define __SBUF  0x0040          /* struct is __file_bufio */
+#define __SWIDE 0x0080          /* wchar output mode */
+	int	(*put)(char, struct __file *);	/* function to write one char to device */
+	int	(*get)(struct __file *);	/* function to read one char from device */
+	int	(*flush)(struct __file *);	/* function to flush output to device */
+#ifdef __STDIO_LOCKING
+	_LOCK_RECURSIVE_T lock;
+#endif
+};
+
+#ifdef __STDIO_LOCKING
+#define __STDIO_UNLOCKED(_fn) _fn##_unlocked
+#else
+#define __STDIO_UNLOCKED(_fn) _fn
+#endif
+
+/*
+ * This variant includes a 'close' function which is
+ * invoked from fclose when the __SCLOSE bit is set
+ */
+struct __file_close {
+	struct __file file;			/* main file struct */
+	int	(*close)(struct __file *);	/* function to close file */
+};
+
+#define FDEV_SETUP_CLOSE(__put, __get, __flush, __close, __flags) \
+        {                                                               \
+                .file = FDEV_SETUP_STREAM(__put, __get, __flush, (__flags) | __SCLOSE),   \
+                .close = (__close),                                      \
+        }
+
+struct __file_ext {
+        struct __file_close cfile;              /* close file struct */
+        __off_t (*seek)(struct __file *, __off_t offset, int whence);
+        int     (*setvbuf)(struct __file *, char *buf, int mode, size_t size);
+};
+
+#define FDEV_SETUP_EXT(__put, __get, __flush, __close, __seek, __setvbuf, __flags) \
+        {                                                               \
+                .cfile = FDEV_SETUP_CLOSE(__put, __get, __flush, __close, (__flags) | __SEXT), \
+                .seek = (__seek),                                        \
+                .setvbuf = (__setvbuf),                                  \
+        }
+
+/*@{*/
+/**
+   \c FILE is the opaque structure that is passed around between the
+   various standard IO functions.
+*/
+#ifndef ___FILE_DECLARED
+typedef struct __file __FILE;
+# define ___FILE_DECLARED
+#endif
+
+#ifndef _FILE_DECLARED
+typedef __FILE FILE;
+#define _FILE_DECLARED
+#endif
+
+/**
+   This symbol is defined when stdin/stdout/stderr are global
+   variables. When undefined, the old __iob array is used which
+   contains the pointers instead
+*/
+#define __PICOLIBC_STDIO_GLOBALS
+
+extern FILE *const stdin;
+extern FILE *const stdout;
+extern FILE *const stderr;
+
+/* The stdin, stdout, and stderr symbols are described as macros in the C
+ * standard. */
+#define stdin stdin
+#define stdout stdout
+#define stderr stderr
+
+#define EOF	(-1)
+
 #define	_IOFBF	0		/* setvbuf should set fully buffered */
 #define	_IOLBF	1		/* setvbuf should set line buffered */
 #define	_IONBF	2		/* setvbuf should set unbuffered */
 
-#define	EOF	(-1)
+#define _FDEV_SETUP_READ  __SRD	/**< fdev_setup_stream() with read intent */
+#define _FDEV_SETUP_WRITE __SWR	/**< fdev_setup_stream() with write intent */
+#define _FDEV_SETUP_RW    (__SRD|__SWR)	/**< fdev_setup_stream() with read/write intent */
 
-#ifdef __BUFSIZ__
-#define	BUFSIZ		__BUFSIZ__
-#else
-#define	BUFSIZ		1024
+/**
+ * Return code for an error condition during device read.
+ *
+ * To be used in the get function of fdevopen().
+ */
+#define _FDEV_ERR (-1)
+
+/**
+ * Return code for an end-of-file condition during device read.
+ *
+ * To be used in the get function of fdevopen().
+ */
+#define _FDEV_EOF (-2)
+
+#define FDEV_SETUP_STREAM(__put, __get, __flush, __flags)        \
+	{                                           \
+                .flags = (__flags),                 \
+                .put = (__put),                     \
+                .get = (__get),                     \
+                .flush = (__flush),                 \
+	}
+
+FILE *fdevopen(int (*__put)(char, FILE*), int (*__get)(FILE*), int(*__flush)(FILE *));
+int	fclose(FILE *__stream);
+int	fflush(FILE *stream);
+
+# define fdev_close(f) (fflush(f))
+
+/* Check for old-style printf selection symbols */
+
+#define __IO_VARIANT_DOUBLE       'd'
+#define __IO_VARIANT_FLOAT        'f'
+#define __IO_VARIANT_LLONG        'l'
+#define __IO_VARIANT_INTEGER      'i'
+#define __IO_VARIANT_MINIMAL      'm'
+
+#ifndef _PICOLIBC_PRINTF
+# if defined(PICOLIBC_DOUBLE_PRINTF_SCANF)
+#  define _PICOLIBC_PRINTF __IO_VARIANT_DOUBLE
+# elif defined(PICOLIBC_FLOAT_PRINTF_SCANF)
+#  define _PICOLIBC_PRINTF __IO_VARIANT_FLOAT
+# elif defined(PICOLIBC_LONG_LONG_PRINTF_SCANF)
+#  define _PICOLIBC_PRINTF __IO_VARIANT_LLONG
+# elif defined(PICOLIBC_INTEGER_PRINTF_SCANF)
+#  define _PICOLIBC_PRINTF __IO_VARIANT_INTEGER
+# elif defined(PICOLIBC_MINIMAL_PRINTF_SCANF)
+#  define _PICOLIBC_PRINTF __IO_VARIANT_MINIMAL
+# else
+#  define _PICOLIBC_PRINTF __IO_DEFAULT
+# endif
 #endif
 
-#ifdef __FOPEN_MAX__
-#define FOPEN_MAX	__FOPEN_MAX__
-#else
-#define	FOPEN_MAX	20
+/* Check for old-style scanf selection symbols */
+
+#ifndef _PICOLIBC_SCANF
+# if defined(PICOLIBC_DOUBLE_PRINTF_SCANF)
+#  define _PICOLIBC_SCANF __IO_VARIANT_DOUBLE
+# elif defined(PICOLIBC_FLOAT_PRINTF_SCANF)
+#  define _PICOLIBC_SCANF __IO_VARIANT_FLOAT
+# elif defined(PICOLIBC_LONG_LONG_PRINTF_SCANF)
+#  define _PICOLIBC_SCANF __IO_VARIANT_LLONG
+# elif defined(PICOLIBC_INTEGER_PRINTF_SCANF)
+#  define _PICOLIBC_SCANF __IO_VARIANT_INTEGER
+# elif defined(PICOLIBC_MINIMAL_PRINTF_SCANF)
+#  define _PICOLIBC_SCANF __IO_VARIANT_MINIMAL
+# else
+#  define _PICOLIBC_SCANF __IO_DEFAULT
+# endif
 #endif
 
-#ifdef __FILENAME_MAX__
-#define FILENAME_MAX    __FILENAME_MAX__
+#if _PICOLIBC_PRINTF == __IO_VARIANT_FLOAT
+#ifdef __GNUCLIKE_PRAGMA_DIAGNOSTIC
+#pragma GCC diagnostic ignored "-Wformat"
+#endif
+#define __FORMAT_ATTRIBUTE__(__a, __s, __f) __picolibc_format(__a, __s, 0)
 #else
-#define	FILENAME_MAX	1024
+#define __FORMAT_ATTRIBUTE__(__a, __s, __f) __picolibc_format(__a, __s, __f)
 #endif
 
-#ifdef __L_tmpnam__
-#define L_tmpnam	__L_tmpnam__
-#else
-#define	L_tmpnam	FILENAME_MAX
+#define __PRINTF_ATTRIBUTE__(__s, __f) __FORMAT_ATTRIBUTE__(printf, __s, __f)
+#define __SCANF_ATTRIBUTE__(__s, _f) __FORMAT_ATTRIBUTE__(scanf, __s, __f)
+
+int	fputc(int __c, FILE *__stream);
+int	putc(int __c, FILE *__stream);
+int	putchar(int __c);
+#define putc(__c, __stream) fputc(__c, __stream)
+#define putchar(__c) fputc(__c, stdout)
+
+int	printf(const char *__fmt, ...) __PRINTF_ATTRIBUTE__(1, 2);
+int	fprintf(FILE *__stream, const char *__fmt, ...) __PRINTF_ATTRIBUTE__(2, 3);
+int	vprintf(const char *__fmt, __gnuc_va_list __ap) __PRINTF_ATTRIBUTE__(1, 0);
+int	vfprintf(FILE *__stream, const char *__fmt, __gnuc_va_list __ap) __PRINTF_ATTRIBUTE__(2, 0);
+int	sprintf(char *__s, const char *__fmt, ...) __PRINTF_ATTRIBUTE__(2, 3);
+int	snprintf(char *__s, size_t __n, const char *__fmt, ...) __PRINTF_ATTRIBUTE__(3, 4);
+int	vsprintf(char *__s, const char *__fmt, __gnuc_va_list ap) __PRINTF_ATTRIBUTE__(2, 0);
+int	vsnprintf(char *__s, size_t __n, const char *__fmt, __gnuc_va_list ap) __PRINTF_ATTRIBUTE__(3, 0);
+int     asprintf(char **strp, const char *fmt, ...) __PRINTF_ATTRIBUTE__(2,3);
+char    *asnprintf(char *str, size_t *lenp, const char *fmt, ...) __PRINTF_ATTRIBUTE__(3,4);
+int     vasprintf(char **strp, const char *fmt, __gnuc_va_list ap) __PRINTF_ATTRIBUTE__(2,0);
+char    *vasnprintf(char *str, size_t *lenp, const char *fmt, __gnuc_va_list ap) __PRINTF_ATTRIBUTE__(3,0);
+
+int	fputs(const char *__str, FILE *__stream);
+int	puts(const char *__str);
+size_t	fwrite(const void *__ptr, size_t __size, size_t __nmemb,
+		       FILE *__stream);
+
+int	fgetc(FILE *__stream);
+int	getc(FILE *__stream);
+int	getchar(void);
+#define getchar() getc(stdin)
+int	ungetc(int __c, FILE *__stream);
+
+int	scanf(const char *__fmt, ...) __FORMAT_ATTRIBUTE__(scanf, 1, 2);
+int	fscanf(FILE *__stream, const char *__fmt, ...) __FORMAT_ATTRIBUTE__(scanf, 2, 3);
+int	vscanf(const char *__fmt, __gnuc_va_list __ap) __FORMAT_ATTRIBUTE__(scanf, 1, 0);
+int	vfscanf(FILE *__stream, const char *__fmt, __gnuc_va_list __ap) __FORMAT_ATTRIBUTE__(scanf, 2, 0);
+int	sscanf(const char *__buf, const char *__fmt, ...) __FORMAT_ATTRIBUTE__(scanf, 2, 3);
+int	vsscanf(const char *__buf, const char *__fmt, __gnuc_va_list ap) __FORMAT_ATTRIBUTE__(scanf, 2, 0);
+
+char	*fgets(char *__str, int __size, FILE *__stream);
+#ifdef _PICOLIBC_USE_DEPRECATED_GETS
+char *gets(char *str);
+#endif
+size_t	fread(void *__ptr, size_t __size, size_t __nmemb,
+		      FILE *__stream);
+
+void	clearerr(FILE *__stream);
+int     ferror(FILE *__stream);
+int     feof(FILE *__stream);
+
+/* fast inlined versions */
+#define __clearerr_unlocked(s) ((s)->flags &= ~(__SERR | __SEOF))
+#define __ferror_unlocked(s) ((s)->flags & __SERR)
+#define __feof_unlocked(s) ((s)->flags & __SEOF)
+
+/* When locking is disabled, use the unlocked macros */
+#ifndef __STDIO_LOCKING
+#define clearerr(s) __clearerr_unlocked(s)
+#define ferror(s) __ferror_unlocked(s)
+#define feof(s) __feof_unlocked(s)
 #endif
 
-#if __BSD_VISIBLE || __XSI_VISIBLE
-#define P_tmpdir        "/tmp"
+/* Expose the unlocked symbols when requested */
+#ifdef __MISC_VISIBLE
+void    clearerr_unlocked(FILE *__stream);
+int     ferror_unlocked(FILE *__stream);
+int     feof_unlocked(FILE *__stream);
+#define clearerr_unlocked(s) __clearerr_unlocked(s)
+#define ferror_unlocked(s) __ferror_unlocked(s)
+#define feof_unlocked(s) __feof_unlocked(s)
 #endif
 
 #ifndef SEEK_SET
@@ -161,206 +343,98 @@ typedef _ssize_t ssize_t;
 #define	SEEK_END	2	/* set file offset to EOF plus offset */
 #endif
 
-#define	TMP_MAX		26
-
-#define	stdin	_REENT_STDIN(_REENT)
-#define	stdout	_REENT_STDOUT(_REENT)
-#define	stderr	_REENT_STDERR(_REENT)
-
-#define _stdin_r(x)	_REENT_STDIN(x)
-#define _stdout_r(x)	_REENT_STDOUT(x)
-#define _stderr_r(x)	_REENT_STDERR(x)
+/* only mentioned for libstdc++ support, not implemented in library */
+#ifndef BUFSIZ
+#define BUFSIZ 512
+#endif
 
 /*
- * Functions defined in ANSI C standard.
+ * We don't have any way of knowing any underlying POSIX limits,
+ * so just use a reasonably small values here
  */
-
-#ifndef __VALIST
-#ifdef __GNUC__
-#define __VALIST __gnuc_va_list
-#else
-#define __VALIST char*
+#ifndef FOPEN_MAX
+#define FOPEN_MAX 32
 #endif
+#ifndef FILENAME_MAX
+#define FILENAME_MAX 1024
 #endif
-
-#if __POSIX_VISIBLE
-char *	ctermid (char *);
-#endif
-#if __GNU_VISIBLE || (__XSI_VISIBLE && __XSI_VISIBLE < 600)
-char *	cuserid (char *);
-#endif
-FILE *	tmpfile (void);
-char *	tmpnam (char *);
-#if __BSD_VISIBLE || __XSI_VISIBLE || __POSIX_VISIBLE >= 200112
-char *	tempnam (const char *, const char *) __malloc_like __result_use_check;
-#endif
-int	fclose (FILE *);
-int	fflush (FILE *);
-FILE *	freopen (const char *__restrict, const char *__restrict, FILE *__restrict);
-void	setbuf (FILE *__restrict, char *__restrict);
-int	setvbuf (FILE *__restrict, char *__restrict, int, size_t);
-int	fprintf (FILE *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-int	fscanf (FILE *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 3)));
-int	printf (const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 1, 2)));
-int	scanf (const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 1, 2)));
-int	sscanf (const char *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 3)));
-int	vfprintf (FILE *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-int	vprintf (const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 1, 0)));
-int	vsprintf (char *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-int	fgetc (FILE *);
-char *  fgets (char *__restrict, int, FILE *__restrict);
-int	fputc (int, FILE *);
-int	fputs (const char *__restrict, FILE *__restrict);
-int	getc (FILE *);
-int	getchar (void);
-char *  gets (char *);
-int	putc (int, FILE *);
-int	putchar (int);
-int	puts (const char *);
-int	ungetc (int, FILE *);
-size_t	fread (void *__restrict, size_t _size, size_t _n, FILE *__restrict);
-size_t	fwrite (const void *__restrict , size_t _size, size_t _n, FILE *);
-#ifdef _LIBC
-int	fgetpos (FILE *, _fpos_t *);
-#else
-int	fgetpos (FILE *__restrict, fpos_t *__restrict);
-#endif
-int	fseek (FILE *, long, int);
-#ifdef _LIBC
-int	fsetpos (FILE *, const _fpos_t *);
-#else
-int	fsetpos (FILE *, const fpos_t *);
-#endif
-long	ftell ( FILE *);
-void	rewind (FILE *);
-void	clearerr (FILE *);
-int	feof (FILE *);
-int	ferror (FILE *);
-void    perror (const char *);
-#ifndef _REENT_ONLY
-FILE *	fopen (const char *__restrict _name, const char *__restrict _type);
-int	sprintf (char *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-int	remove (const char *);
-int	rename (const char *, const char *);
-#ifdef _LIBC
-int	_rename (const char *, const char *);
-#endif
-#endif
-#if __LARGEFILE_VISIBLE || __POSIX_VISIBLE >= 200112
-#ifdef _LIBC
-int	fseeko (FILE *, _off_t, int);
-_off_t	ftello (FILE *);
-#else
-int	fseeko (FILE *, off_t, int);
-off_t	ftello (FILE *);
-#endif
-#endif
-#if __GNU_VISIBLE
-int	fcloseall (void);
-#endif
-#ifndef _REENT_ONLY
-#if __ISO_C_VISIBLE >= 1999
-int	snprintf (char *__restrict, size_t, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	vsnprintf (char *__restrict, size_t, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	vfscanf (FILE *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 0)));
-int	vscanf (const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 1, 0)));
-int	vsscanf (const char *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 0)));
-#endif
-#if __GNU_VISIBLE
-int	asprintf (char **__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-int	vasprintf (char **, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-#endif
-#if __MISC_VISIBLE /* Newlib-specific */
-int	asiprintf (char **, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-char *	asniprintf (char *, size_t *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-char *	asnprintf (char *__restrict, size_t *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-#ifndef diprintf
-int	diprintf (int, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-#endif
-int	fiprintf (FILE *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-int	fiscanf (FILE *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 3)));
-int	iprintf (const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 1, 2)));
-int	iscanf (const char *, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 1, 2)));
-int	siprintf (char *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-int	siscanf (const char *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 3)));
-int	sniprintf (char *, size_t, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	vasiprintf (char **, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-char *	vasniprintf (char *, size_t *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-char *	vasnprintf (char *, size_t *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	vdiprintf (int, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-int	vfiprintf (FILE *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-int	vfiscanf (FILE *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 0)));
-int	viprintf (const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 1, 0)));
-int	viscanf (const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 1, 0)));
-int	vsiprintf (char *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-int	vsiscanf (const char *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 0)));
-int	vsniprintf (char *, size_t, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-#endif /* __MISC_VISIBLE */
-#endif /* !_REENT_ONLY */
 
 /*
- * Routines in POSIX 1003.1:2001.
+ * Declare required C types
+ *
+ * size_t comes from stddef.h (included from cdefs.h)
  */
+typedef _fpos_t fpos_t;
 
 #if __POSIX_VISIBLE
-#ifndef _REENT_ONLY
-FILE *	fdopen (int, const char *);
+/*
+ * Declare required additional POSIX types.
+ */
+
+# ifndef _OFF_T_DECLARED
+typedef	__off_t		off_t;		/* file offset */
+#  define _OFF_T_DECLARED
+# endif
+
+#ifndef _OFF64_T_DECLARED
+typedef __off64_t       off64_t;        /* 64-bit file offset */
+#define	_OFF64_T_DECLARED
 #endif
-int	fileno (FILE *);
+
+# ifndef _SSIZE_T_DECLARED
+typedef _ssize_t ssize_t;
+#  define _SSIZE_T_DECLARED
+# endif
+
+/* This needs to agree with <stdarg.h> */
+# ifdef __GNUC__
+#  ifndef _VA_LIST_DEFINED
+typedef __gnuc_va_list va_list;
+#   define _VA_LIST_DEFINED
+#  endif
+# else
+#  include <stdarg.h>
+# endif
+
 #endif
-#if __MISC_VISIBLE || __POSIX_VISIBLE >= 199209
-int	pclose (FILE *);
-FILE *  popen (const char *, const char *);
-#endif
+
+int fgetpos(FILE * __restrict stream, fpos_t * __restrict pos);
+FILE *fopen(const char *path, const char *mode) __malloc_like_with_free(fclose, 1);
+FILE *freopen(const char *path, const char *mode, FILE *stream);
+FILE *fdopen(int, const char *) __malloc_like_with_free(fclose, 1);
+FILE *fmemopen(void *buf, size_t size, const char *mode) __malloc_like_with_free(fclose, 1);
+int fseek(FILE *stream, long offset, int whence);
+int fseeko(FILE *stream, __off_t offset, int whence);
+int fsetpos(FILE *stream, const fpos_t *pos);
+long ftell(FILE *stream);
+__off_t ftello(FILE *stream);
+int fileno(FILE *);
+void perror(const char *s);
+int remove(const char *pathname);
+int rename(const char *oldpath, const char *newpath);
+void rewind(FILE *stream);
+void setbuf(FILE *stream, char *buf);
+void setbuffer(FILE *stream, char *buf, size_t size);
+void setlinebuf(FILE *stream);
+int setvbuf(FILE *stream, char *buf, int mode, size_t size);
+FILE *tmpfile(void);
+char *tmpnam (char *s);
+_ssize_t getline(char **__restrict lineptr, size_t *__restrict n, FILE *__restrict stream);
+_ssize_t getdelim(char **__restrict lineptr, size_t *__restrict  n, int delim, FILE *__restrict stream);
 
 #if __BSD_VISIBLE
-void    setbuffer (FILE *, char *, int);
-int	setlinebuf (FILE *);
-#endif
+FILE	*funopen (const void *cookie,
+		_ssize_t (*readfn)(void *cookie, void *buf,
+				size_t n),
+		_ssize_t (*writefn)(void *cookie, const void *buf,
+				 size_t n),
+		__off_t (*seekfn)(void *cookie, __off_t off, int whence),
+		int (*closefn)(void *cookie));
+# define	fropen(__cookie, __fn) funopen(__cookie, __fn, NULL, NULL, NULL)
+# define	fwopen(__cookie, __fn) funopen(__cookie, NULL, __fn, NULL, NULL)
+#endif /*__BSD_VISIBLE */
 
-#if __MISC_VISIBLE || (__XSI_VISIBLE && __POSIX_VISIBLE < 200112)
-int	getw (FILE *);
-int	putw (int, FILE *);
-#endif
-#if __MISC_VISIBLE || __POSIX_VISIBLE
+#if __POSIX_VISIBLE >= 199309L
 int	getc_unlocked (FILE *);
 int	getchar_unlocked (void);
 void	flockfile (FILE *);
@@ -368,435 +442,130 @@ int	ftrylockfile (FILE *);
 void	funlockfile (FILE *);
 int	putc_unlocked (int, FILE *);
 int	putchar_unlocked (int);
+#ifndef __STDIO_LOCKING
+#define getc_unlocked(f) getc(f)
+#define getchar_unlocked(f) getc(stdin)
+#define putc_unlocked(c, f) putc(c, f)
+#define putchar_unlocked(c, f) putc(c, stdout)
+#endif
+#endif
+
+#if __STDC_WANT_LIB_EXT1__ == 1
+#include <sys/_types.h>
+#include <stdarg.h>
+
+#ifndef _ERRNO_T_DEFINED
+typedef __errno_t errno_t;
+#define _ERRNO_T_DEFINED
+#endif
+
+#ifndef _RSIZE_T_DEFINED
+typedef __rsize_t rsize_t;
+#define _RSIZE_T_DEFINED
+#endif
+
+int sprintf_s(char *__restrict __s, rsize_t __bufsize,
+              const char *__restrict __format, ...);
+int vsnprintf_s(char *__restrict s, rsize_t n, const char *__restrict fmt,
+                va_list arg);
+int vfprintf_s(FILE *__restrict stream, const char *__restrict fmt,
+               va_list ap_orig);
 #endif
 
 /*
- * Routines in POSIX 1003.1:200x.
+ * The format of tmpnam names is TXXXXXX, which works with mktemp
  */
+#define L_tmpnam        8
 
-#if __POSIX_VISIBLE >= 200809
-# ifndef _REENT_ONLY
-#  ifndef dprintf
-int	dprintf (int, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-#  endif
-FILE *	fmemopen (void *__restrict, size_t, const char *__restrict);
-/* getdelim - see __getdelim for now */
-/* getline - see __getline for now */
-FILE *	open_memstream (char **, size_t *);
-int	vdprintf (int, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
+/*
+ * tmpnam files are created in the current directory
+ */
+#define P_tmpdir        ""
+
+/*
+ * We don't have any way of knowing any underlying POSIX limits,
+ * so just use a reasonably small value here
+ */
+#ifndef TMP_MAX
+#define TMP_MAX         32
+#endif
+
+/*@}*/
+
+static __inline __uint32_t
+__printf_float(float f)
+{
+	union {
+		float		f;
+		__uint32_t	u;
+	} u = { .f = f };
+	return u.u;
+}
+
+/* Express printf capabilities to applications in the form of _HAS_IO values */
+
+#if _PICOLIBC_PRINTF == __IO_VARIANT_MINIMAL
+# define printf_float(x) ((double) (x))
+# if defined(__IO_MINIMAL_LONG_LONG) || __SIZEOF_LONG_LONG__ == __SIZEOF_LONG__
+#  define _HAS_IO_LONG_LONG
+# endif
+# ifdef __IO_C99_FORMATS
+#  define _HAS_IO_C99_FORMATS
+# endif
+#elif _PICOLIBC_PRINTF == __IO_VARIANT_INTEGER
+# define printf_float(x) ((double) (x))
+# if defined(__IO_LONG_LONG) || __SIZEOF_LONG_LONG__ == __SIZEOF_LONG__
+#  define _HAS_IO_LONG_LONG
+# endif
+# ifdef __IO_POS_ARGS
+#  define _HAS_IO_POS_ARGS
+# endif
+# ifdef __IO_C99_FORMATS
+#  define _HAS_IO_C99_FORMATS
+# endif
+# ifdef __IO_PERCENT_B
+#  define _HAS_IO_PERCENT_B
+# endif
+#elif _PICOLIBC_PRINTF == __IO_VARIANT_LLONG
+# define printf_float(x) ((double) (x))
+# define _HAS_IO_LONG_LONG
+# ifdef __IO_POS_ARGS
+#  define _HAS_IO_POS_ARGS
+# endif
+# ifdef __IO_C99_FORMATS
+#  define _HAS_IO_C99_FORMATS
+# endif
+# ifdef __IO_PERCENT_B
+#  define _HAS_IO_PERCENT_B
+# endif
+#elif _PICOLIBC_PRINTF == __IO_VARIANT_FLOAT
+# define printf_float(x) __printf_float(x)
+# define _HAS_IO_LONG_LONG
+# define _HAS_IO_POS_ARGS
+# define _HAS_IO_C99_FORMATS
+# ifdef __IO_PERCENT_B
+#  define _HAS_IO_PERCENT_B
+# endif
+# define _HAS_IO_FLOAT
+#else /* _PICOLIBC_PRINTF == __IO_VARIANT_DOUBLE */
+# define printf_float(x) ((double) (x))
+# define _HAS_IO_LONG_LONG
+# define _HAS_IO_POS_ARGS
+# define _HAS_IO_C99_FORMATS
+# define _HAS_IO_DOUBLE
+# if defined(__MB_CAPABLE) || defined(__IO_WCHAR)
+#  define _HAS_IO_WCHAR
+# endif
+# ifdef __MB_CAPABLE
+#  define _HAS_IO_MBCHAR
+# endif
+# ifdef __IO_PERCENT_B
+#  define _HAS_IO_PERCENT_B
+# endif
+# ifdef __IO_LONG_DOUBLE
+#  define _HAS_IO_LONG_DOUBLE
 # endif
 #endif
-#if __ATFILE_VISIBLE
-int	renameat (int, const char *, int, const char *);
-# ifdef __CYGWIN__
-int	renameat2 (int, const char *, int, const char *, unsigned int);
-# endif
-#endif
-
-/*
- * Recursive versions of the above.
- */
-
-int	_asiprintf_r (struct _reent *, char **, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-char *	_asniprintf_r (struct _reent *, char *, size_t *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 5)));
-char *	_asnprintf_r (struct _reent *, char *__restrict, size_t *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 5)));
-int	_asprintf_r (struct _reent *, char **__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	_diprintf_r (struct _reent *, int, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	_dprintf_r (struct _reent *, int, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	_fclose_r (struct _reent *, FILE *);
-int	_fcloseall_r (struct _reent *);
-FILE *	_fdopen_r (struct _reent *, int, const char *);
-int	_fflush_r (struct _reent *, FILE *);
-int	_fgetc_r (struct _reent *, FILE *);
-int	_fgetc_unlocked_r (struct _reent *, FILE *);
-char *  _fgets_r (struct _reent *, char *__restrict, int, FILE *__restrict);
-char *  _fgets_unlocked_r (struct _reent *, char *__restrict, int, FILE *__restrict);
-#ifdef _LIBC
-int	_fgetpos_r (struct _reent *, FILE *__restrict, _fpos_t *__restrict);
-int	_fsetpos_r (struct _reent *, FILE *, const _fpos_t *);
-#else
-int	_fgetpos_r (struct _reent *, FILE *, fpos_t *);
-int	_fsetpos_r (struct _reent *, FILE *, const fpos_t *);
-#endif
-int	_fiprintf_r (struct _reent *, FILE *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	_fiscanf_r (struct _reent *, FILE *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 4)));
-FILE *	_fmemopen_r (struct _reent *, void *__restrict, size_t, const char *__restrict);
-FILE *	_fopen_r (struct _reent *, const char *__restrict, const char *__restrict);
-FILE *	_freopen_r (struct _reent *, const char *__restrict, const char *__restrict, FILE *__restrict);
-int	_fprintf_r (struct _reent *, FILE *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	_fpurge_r (struct _reent *, FILE *);
-int	_fputc_r (struct _reent *, int, FILE *);
-int	_fputc_unlocked_r (struct _reent *, int, FILE *);
-int	_fputs_r (struct _reent *, const char *__restrict, FILE *__restrict);
-int	_fputs_unlocked_r (struct _reent *, const char *__restrict, FILE *__restrict);
-size_t	_fread_r (struct _reent *, void *__restrict, size_t _size, size_t _n, FILE *__restrict);
-size_t	_fread_unlocked_r (struct _reent *, void *__restrict, size_t _size, size_t _n, FILE *__restrict);
-int	_fscanf_r (struct _reent *, FILE *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 4)));
-int	_fseek_r (struct _reent *, FILE *, long, int);
-int	_fseeko_r (struct _reent *, FILE *, _off_t, int);
-long	_ftell_r (struct _reent *, FILE *);
-_off_t	_ftello_r (struct _reent *, FILE *);
-void	_rewind_r (struct _reent *, FILE *);
-size_t	_fwrite_r (struct _reent *, const void *__restrict, size_t _size, size_t _n, FILE *__restrict);
-size_t	_fwrite_unlocked_r (struct _reent *, const void *__restrict, size_t _size, size_t _n, FILE *__restrict);
-int	_getc_r (struct _reent *, FILE *);
-int	_getc_unlocked_r (struct _reent *, FILE *);
-int	_getchar_r (struct _reent *);
-int	_getchar_unlocked_r (struct _reent *);
-char *	_gets_r (struct _reent *, char *);
-int	_iprintf_r (struct _reent *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-int	_iscanf_r (struct _reent *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 3)));
-FILE *	_open_memstream_r (struct _reent *, char **, size_t *);
-void	_perror_r (struct _reent *, const char *);
-int	_printf_r (struct _reent *, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 3)));
-int	_putc_r (struct _reent *, int, FILE *);
-int	_putc_unlocked_r (struct _reent *, int, FILE *);
-int	_putchar_unlocked_r (struct _reent *, int);
-int	_putchar_r (struct _reent *, int);
-int	_puts_r (struct _reent *, const char *);
-int	_remove_r (struct _reent *, const char *);
-int	_rename_r (struct _reent *,
-			   const char *_old, const char *_new);
-int	_scanf_r (struct _reent *, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 3)));
-int	_siprintf_r (struct _reent *, char *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	_siscanf_r (struct _reent *, const char *, const char *, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 4)));
-int	_sniprintf_r (struct _reent *, char *, size_t, const char *, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 5)));
-int	_snprintf_r (struct _reent *, char *__restrict, size_t, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 5)));
-int	_sprintf_r (struct _reent *, char *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 4)));
-int	_sscanf_r (struct _reent *, const char *__restrict, const char *__restrict, ...)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 4)));
-char *	_tempnam_r (struct _reent *, const char *, const char *);
-FILE *	_tmpfile_r (struct _reent *);
-char *	_tmpnam_r (struct _reent *, char *);
-int	_ungetc_r (struct _reent *, int, FILE *);
-int	_vasiprintf_r (struct _reent *, char **, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-char *	_vasniprintf_r (struct _reent*, char *, size_t *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 0)));
-char *	_vasnprintf_r (struct _reent*, char *, size_t *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 0)));
-int	_vasprintf_r (struct _reent *, char **, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	_vdiprintf_r (struct _reent *, int, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	_vdprintf_r (struct _reent *, int, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	_vfiprintf_r (struct _reent *, FILE *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	_vfiscanf_r (struct _reent *, FILE *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 0)));
-int	_vfprintf_r (struct _reent *, FILE *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	_vfscanf_r (struct _reent *, FILE *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 0)));
-int	_viprintf_r (struct _reent *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-int	_viscanf_r (struct _reent *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 0)));
-int	_vprintf_r (struct _reent *, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 2, 0)));
-int	_vscanf_r (struct _reent *, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 2, 0)));
-int	_vsiprintf_r (struct _reent *, char *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	_vsiscanf_r (struct _reent *, const char *, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 0)));
-int	_vsniprintf_r (struct _reent *, char *, size_t, const char *, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 0)));
-int	_vsnprintf_r (struct _reent *, char *__restrict, size_t, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 4, 0)));
-int	_vsprintf_r (struct _reent *, char *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__printf__, 3, 0)));
-int	_vsscanf_r (struct _reent *, const char *__restrict, const char *__restrict, __VALIST)
-               _ATTRIBUTE ((__format__ (__scanf__, 3, 0)));
-
-/* Other extensions.  */
-
-int	fpurge (FILE *);
-ssize_t __getdelim (char **, size_t *, int, FILE *);
-ssize_t __getline (char **, size_t *, FILE *);
-
-#if __MISC_VISIBLE
-void	clearerr_unlocked (FILE *);
-int	feof_unlocked (FILE *);
-int	ferror_unlocked (FILE *);
-int	fileno_unlocked (FILE *);
-int	fflush_unlocked (FILE *);
-int	fgetc_unlocked (FILE *);
-int	fputc_unlocked (int, FILE *);
-size_t	fread_unlocked (void *__restrict, size_t _size, size_t _n, FILE *__restrict);
-size_t	fwrite_unlocked (const void *__restrict , size_t _size, size_t _n, FILE *);
-#endif
-
-#if __GNU_VISIBLE
-char *  fgets_unlocked (char *__restrict, int, FILE *__restrict);
-int	fputs_unlocked (const char *__restrict, FILE *__restrict);
-#endif
-
-#ifdef __LARGE64_FILES
-#if !defined(__CYGWIN__) || defined(_LIBC)
-FILE *	fdopen64 (int, const char *);
-FILE *  fopen64 (const char *, const char *);
-FILE *  freopen64 (const char *, const char *, FILE *);
-_off64_t ftello64 (FILE *);
-_off64_t fseeko64 (FILE *, _off64_t, int);
-int     fgetpos64 (FILE *, _fpos64_t *);
-int     fsetpos64 (FILE *, const _fpos64_t *);
-FILE *  tmpfile64 (void);
-
-FILE *	_fdopen64_r (struct _reent *, int, const char *);
-FILE *  _fopen64_r (struct _reent *,const char *, const char *);
-FILE *  _freopen64_r (struct _reent *, const char *, const char *, FILE *);
-_off64_t _ftello64_r (struct _reent *, FILE *);
-_off64_t _fseeko64_r (struct _reent *, FILE *, _off64_t, int);
-int     _fgetpos64_r (struct _reent *, FILE *, _fpos64_t *);
-int     _fsetpos64_r (struct _reent *, FILE *, const _fpos64_t *);
-FILE *  _tmpfile64_r (struct _reent *);
-#endif /* !__CYGWIN__ */
-#endif /* __LARGE64_FILES */
-
-/*
- * Routines internal to the implementation.
- */
-
-int	__srget_r (struct _reent *, FILE *);
-int	__swbuf_r (struct _reent *, int, FILE *);
-
-/*
- * Stdio function-access interface.
- */
-
-#if __BSD_VISIBLE
-# ifdef __LARGE64_FILES
-FILE	*funopen (const void *__cookie,
-		int (*__readfn)(void *__c, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
-		int (*__writefn)(void *__c, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
-		_fpos64_t (*__seekfn)(void *__c, _fpos64_t __off, int __whence),
-		int (*__closefn)(void *__c));
-FILE	*_funopen_r (struct _reent *, const void *__cookie,
-		int (*__readfn)(void *__c, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
-		int (*__writefn)(void *__c, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
-		_fpos64_t (*__seekfn)(void *__c, _fpos64_t __off, int __whence),
-		int (*__closefn)(void *__c));
-# else
-FILE	*funopen (const void *__cookie,
-		int (*__readfn)(void *__cookie, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
-		int (*__writefn)(void *__cookie, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
-		fpos_t (*__seekfn)(void *__cookie, fpos_t __off, int __whence),
-		int (*__closefn)(void *__cookie));
-FILE	*_funopen_r (struct _reent *, const void *__cookie,
-		int (*__readfn)(void *__cookie, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
-		int (*__writefn)(void *__cookie, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
-		fpos_t (*__seekfn)(void *__cookie, fpos_t __off, int __whence),
-		int (*__closefn)(void *__cookie));
-# endif /* !__LARGE64_FILES */
-
-# define	fropen(__cookie, __fn) funopen(__cookie, __fn, NULL, NULL, NULL)
-# define	fwopen(__cookie, __fn) funopen(__cookie, NULL, __fn, NULL, NULL)
-#endif /* __BSD_VISIBLE */
-
-#if __GNU_VISIBLE
-typedef ssize_t cookie_read_function_t(void *__cookie, char *__buf, size_t __n);
-typedef ssize_t cookie_write_function_t(void *__cookie, const char *__buf,
-					size_t __n);
-# ifdef __LARGE64_FILES
-typedef int cookie_seek_function_t(void *__cookie, _off64_t *__off,
-				   int __whence);
-# else
-typedef int cookie_seek_function_t(void *__cookie, off_t *__off, int __whence);
-# endif /* !__LARGE64_FILES */
-typedef int cookie_close_function_t(void *__cookie);
-typedef struct
-{
-  /* These four struct member names are dictated by Linux; hopefully,
-     they don't conflict with any macros.  */
-  cookie_read_function_t  *read;
-  cookie_write_function_t *write;
-  cookie_seek_function_t  *seek;
-  cookie_close_function_t *close;
-} cookie_io_functions_t;
-FILE *fopencookie (void *__cookie,
-		const char *__mode, cookie_io_functions_t __functions);
-FILE *_fopencookie_r (struct _reent *, void *__cookie,
-		const char *__mode, cookie_io_functions_t __functions);
-#endif /* __GNU_VISIBLE */
-
-#ifndef __CUSTOM_FILE_IO__
-/*
- * The __sfoo macros are here so that we can 
- * define function versions in the C library.
- */
-#define       __sgetc_raw_r(__ptr, __f) (--(__f)->_r < 0 ? __srget_r(__ptr, __f) : (int)(*(__f)->_p++))
-
-#ifdef __SCLE
-/*  For a platform with CR/LF, additional logic is required by
-  __sgetc_r which would otherwise simply be a macro; therefore we
-  use an inlined function.  The function is only meant to be inlined
-  in place as used and the function body should never be emitted.  
-
-  There are two possible means to this end when compiling with GCC,
-  one when compiling with a standard C99 compiler, and for other
-  compilers we're just stuck.  At the moment, this issue only
-  affects the Cygwin target, so we'll most likely be using GCC. */
-
-_ELIDABLE_INLINE int __sgetc_r(struct _reent *__ptr, FILE *__p);
-
-_ELIDABLE_INLINE int __sgetc_r(struct _reent *__ptr, FILE *__p)
-  {
-    int __c = __sgetc_raw_r(__ptr, __p);
-    if ((__p->_flags & __SCLE) && (__c == '\r'))
-      {
-      int __c2 = __sgetc_raw_r(__ptr, __p);
-      if (__c2 == '\n')
-        __c = __c2;
-      else
-        ungetc(__c2, __p);
-      }
-    return __c;
-  }
-#else
-#define __sgetc_r(__ptr, __p) __sgetc_raw_r(__ptr, __p)
-#endif
-
-#ifdef __GNUC__
-_ELIDABLE_INLINE int __sputc_r(struct _reent *_ptr, int _c, FILE *_p) {
-#ifdef __SCLE
-	if ((_p->_flags & __SCLE) && _c == '\n')
-	  __sputc_r (_ptr, '\r', _p);
-#endif
-	if (--_p->_w >= 0 || (_p->_w >= _p->_lbfsize && (char)_c != '\n'))
-		return (*_p->_p++ = _c);
-	else
-		return (__swbuf_r(_ptr, _c, _p));
-}
-#else
-/*
- * This has been tuned to generate reasonable code on the vax using pcc
- */
-#define       __sputc_raw_r(__ptr, __c, __p) \
-	(--(__p)->_w < 0 ? \
-		(__p)->_w >= (__p)->_lbfsize ? \
-			(*(__p)->_p = (__c)), *(__p)->_p != '\n' ? \
-				(int)*(__p)->_p++ : \
-				__swbuf_r(__ptr, '\n', __p) : \
-			__swbuf_r(__ptr, (int)(__c), __p) : \
-		(*(__p)->_p = (__c), (int)*(__p)->_p++))
-#ifdef __SCLE
-#define __sputc_r(__ptr, __c, __p) \
-        ((((__p)->_flags & __SCLE) && ((__c) == '\n')) \
-          ? __sputc_raw_r(__ptr, '\r', (__p)) : 0 , \
-        __sputc_raw_r((__ptr), (__c), (__p)))
-#else
-#define __sputc_r(__ptr, __c, __p) __sputc_raw_r(__ptr, __c, __p)
-#endif
-#endif
-
-#define	__sfeof(p)	((int)(((p)->_flags & __SEOF) != 0))
-#define	__sferror(p)	((int)(((p)->_flags & __SERR) != 0))
-#define	__sclearerr(p)	((void)((p)->_flags &= ~(__SERR|__SEOF)))
-#define	__sfileno(p)	((p)->_file)
-
-#ifndef __cplusplus
-#ifndef _REENT_SMALL
-#define	feof(p)		__sfeof(p)
-#define	ferror(p)	__sferror(p)
-#define	clearerr(p)	__sclearerr(p)
-
-#if __MISC_VISIBLE
-#define	feof_unlocked(p)	__sfeof(p)
-#define	ferror_unlocked(p)	__sferror(p)
-#define	clearerr_unlocked(p)	__sclearerr(p)
-#endif /* __MISC_VISIBLE */
-#endif /* _REENT_SMALL */
-
-#if 0 /* __POSIX_VISIBLE - FIXME: must initialize stdio first, use fn */
-#define	fileno(p)	__sfileno(p)
-#endif
-
-static __inline int
-_getchar_unlocked(void)
-{
-	struct _reent *_ptr;
-
-	_ptr = _REENT;
-	return (__sgetc_r(_ptr, _stdin_r(_ptr)));
-}
-
-static __inline int
-_putchar_unlocked(int _c)
-{
-	struct _reent *_ptr;
-
-	_ptr = _REENT;
-	return (__sputc_r(_ptr, _c, _stdout_r(_ptr)));
-}
-
-#ifdef __SINGLE_THREAD__
-#define	getc(_p)	__sgetc_r(_REENT, _p)
-#define	putc(_c, _p)	__sputc_r(_REENT, _c, _p)
-#define	getchar()	_getchar_unlocked()
-#define	putchar(_c)	_putchar_unlocked(_c)
-#endif /* __SINGLE_THREAD__ */
-
-#if __MISC_VISIBLE || __POSIX_VISIBLE
-#define	getchar_unlocked()	_getchar_unlocked()
-#define	putchar_unlocked(_c)	_putchar_unlocked(_c)
-#endif
-#endif /* __cplusplus */
-
-#if __MISC_VISIBLE
-/* fast always-buffered version, true iff error */
-#define	fast_putc(x,p) (--(p)->_w < 0 ? \
-	__swbuf_r(_REENT, (int)(x), p) == EOF : (*(p)->_p = (x), (p)->_p++, 0))
-#endif
-
-#if __GNU_VISIBLE || (__XSI_VISIBLE && __XSI_VISIBLE < 600)
-#define	L_cuserid	9		/* posix says it goes in stdio.h :( */
-#endif
-#if __POSIX_VISIBLE
-#define L_ctermid       16
-#endif
-
-#else /* __CUSTOM_FILE_IO__ */
-
-#define	getchar()	getc(stdin)
-#define	putchar(x)	putc(x, stdout)
-
-#if __MISC_VISIBLE || __POSIX_VISIBLE
-#define	getchar_unlocked()	getc_unlocked(stdin)
-#define	putchar_unlocked(x)	putc_unlocked(x, stdout)
-#endif
-
-#endif /* !__CUSTOM_FILE_IO__ */
 
 _END_STD_C
 

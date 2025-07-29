@@ -36,7 +36,7 @@
 #include "stdio_private.h"
 
 int
-__file_str_get(FILE *stream)
+__why_file_str_get(FILE *stream)
 {
 	struct __file_str *sstream = (struct __file_str *) stream;
 	int rv;

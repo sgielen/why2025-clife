@@ -12,6 +12,9 @@
   - Add trace hooks for traceTASK_SWITCHED_IN and traceTASK_SWITCHED_OUT
     - BadgeVMS uses these tracepoints to swap in and out the MMU mappings for each task
 
+* esp_driver_ppa (From esp-idf v5.5)
+  - Make ppa dma2d callback IRAM safe
+
 * esp_lcd (From esp-idf v5.5)
   - Use BadgeVMS framebuffer allocator instead of heap_caps_*
 
@@ -19,6 +22,7 @@
   - Disable default MMU mapping
     - BadgeVMS manages all PSRam MMU mappings
   - esp_psram_check_ptr_addr only checks for vaddr range, not actual mapping
+  - Allow SPIRAM_TRY_ALLOCATE_WIFI_LWIP even when not integrated into malloc
 
 * esp_hw_support (From esp-idf v5.5)
   - Add an option to slightly increase PSRAM voltage
@@ -35,5 +39,3 @@
   - Use BadgeVMS malloc/free
   - Use BadgeVMS open/read/write/lseek
 
-* sdl3
-  - Add BadgeVMS video drivers

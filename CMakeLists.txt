@@ -31,19 +31,36 @@ function(prepare_fatfs_image)
 
     get_property(ALL_APP_ELFS GLOBAL PROPERTY APP_ELFS)
 
+    set(FATFS_STAGED_FILES "")
+    set(APP_ELF_TARGETS "")
+
     foreach(APP_ELF ${ALL_APP_ELFS})
         get_filename_component(ELF_NAME ${APP_ELF} NAME)
+
+        set(STAGED_FILE ${FATFS_STAGING_DIR}/${ELF_NAME})
+
         add_custom_command(
-            OUTPUT ${FATFS_STAGING_DIR}/${ELF_NAME}
-            COMMAND ${CMAKE_COMMAND} -E copy ${APP_ELF} ${FATFS_STAGING_DIR}/${ELF_NAME}
-            COMMAND ${CMAKE_STRIP} ${FATFS_STAGING_DIR}/${ELF_NAME}
+            OUTPUT ${STAGED_FILE}
+            COMMAND ${CMAKE_COMMAND} -E copy ${APP_ELF} ${STAGED_FILE}
+            COMMAND ${CMAKE_STRIP} ${STAGED_FILE}
             DEPENDS ${APP_ELF}
             COMMENT "Copying ${ELF_NAME} to fatfs staging"
         )
-        list(APPEND FATFS_STAGED_FILES ${FATFS_STAGING_DIR}/${ELF_NAME})
+
+        list(APPEND FATFS_STAGED_FILES ${STAGED_FILE})
+
+        get_filename_component(ELF_NAME_WE ${APP_ELF} NAME_WE)
+        list(APPEND APP_ELF_TARGETS ${ELF_NAME_WE}_elf)
     endforeach()
 
-    add_custom_target(prepare_fatfs_staging ALL DEPENDS ${FATFS_STAGED_FILES})
+    add_custom_target(prepare_fatfs_staging ALL
+        DEPENDS ${FATFS_STAGED_FILES}
+    )
+
+    # Ensure the staging target depends on all app ELF targets
+    if(APP_ELF_TARGETS)
+        add_dependencies(prepare_fatfs_staging ${APP_ELF_TARGETS})
+    endif()
 endfunction()
 
 prepare_fatfs_image()

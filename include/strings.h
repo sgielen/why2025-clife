@@ -36,12 +36,21 @@
 #include <sys/_locale.h>
 #endif
 
-#ifndef _SIZE_T_DECLARED
+// As per the GCC source, _SIZE_T_DECLARD is FreeBSD 5
+// So: Also check for _SIZE_T
+#if !defined(_SIZE_T_DECLARED) && !defined(_SIZE_T)
 typedef	__size_t	size_t;
+#endif
+
+#ifndef _SIZE_T_DECLARED
 #define	_SIZE_T_DECLARED
 #endif
 
-__BEGIN_DECLS
+#ifndef _SIZE_T
+#define _SIZE_T
+#endif
+
+_BEGIN_STD_C
 #if __BSD_VISIBLE || __POSIX_VISIBLE <= 200112
 int	 bcmp(const void *, const void *, size_t) __pure;	/* LEGACY */
 void	 bcopy(const void *, void *, size_t);			/* LEGACY */
@@ -51,14 +60,14 @@ void	 bzero(void *, size_t);					/* LEGACY */
 void	 explicit_bzero(void *, size_t);
 #endif
 #if __MISC_VISIBLE || __POSIX_VISIBLE < 200809 || __XSI_VISIBLE >= 700
-int	 ffs(int) __pure2;
+int	 ffs(int) __const;
 #endif
 #if __BSD_VISIBLE
-int	 ffsl(long) __pure2;
-int	 ffsll(long long) __pure2;
-int	 fls(int) __pure2;
-int	 flsl(long) __pure2;
-int	 flsll(long long) __pure2;
+int	 ffsl(long) __const;
+int	 ffsll(long long) __const;
+int	 fls(int) __const;
+int	 flsl(long) __const;
+int	 flsll(long long) __const;
 #endif
 #if __BSD_VISIBLE || __POSIX_VISIBLE <= 200112
 char	*index(const char *, int) __pure;			/* LEGACY */
@@ -71,7 +80,7 @@ int	 strncasecmp(const char *, const char *, size_t) __pure;
 int	 strcasecmp_l (const char *, const char *, locale_t);
 int	 strncasecmp_l (const char *, const char *, size_t, locale_t);
 #endif
-__END_DECLS
+_END_STD_C
 
 #if __SSP_FORTIFY_LEVEL > 0
 #include <ssp/strings.h>
