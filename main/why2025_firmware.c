@@ -143,8 +143,8 @@ int app_main(void) {
         while (get_num_tasks() < 1) {
             // pidb = run_task_path("FLASH0:bench_basic_b.elf", 4096, TASK_TYPE_ELF, 2, argv);
             // pidb = run_task_path("FLASH0:framebuffer_test_a.elf", 4096, TASK_TYPE_ELF, 2, argv);
-            //pidb = run_task_path("FLASH0:hardware_test.elf", 4096, TASK_TYPE_ELF, 2, argv);
-            pidb = run_task_path("FLASH0:sdl_test.elf", 4096, TASK_TYPE_ELF, 2, argv);
+            pidb = run_task_path("FLASH0:hardware_test.elf", 4096, TASK_TYPE_ELF, 2, argv);
+            // pidb = run_task_path("FLASH0:sdl_test.elf", 4096, TASK_TYPE_ELF, 2, argv);
             vTaskDelay(10 / portTICK_PERIOD_MS);
         }
         free_ram = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);

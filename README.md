@@ -1,6 +1,10 @@
 # Welcome to BadgeVMS
 
-BadgeVMS is the most used Badge operating system on the WHY2025 camp. Some feature highlights:
+BadgeVMS is the most used Badge operating system on the WHY2025 camp.
+
+![BadgeVMS Logo](fatfs_image/BadgeVMS.png)
+
+Some feature highlights:
 
 * Multiple programs can run at once
 * Every program gets its own linear address space
