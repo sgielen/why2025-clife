@@ -15,6 +15,8 @@ set(APP_COMPILE_FLAGS
     -fno-builtin-function
     -fno-jump-tables
     -fno-tree-switch-conversion
+    -fno-exceptions
+    -fno-rtti
     -fstrict-volatile-bitfields
     -fvisibility=hidden
     -g3
@@ -342,6 +344,15 @@ build_app(thread_test
 build_app(wifi_test
     SOURCES
      wifi_test.c
+)
+
+build_app(gameoflife_color PREINSTALL
+    SOURCES
+     main.cpp
+    LIBRARIES
+     sdl3
+     # TODO: I'd like to link stdc++ but it doesn't seem to work?
+     #stdc++
 )
 
 get_property(SDK_APP_ELFS GLOBAL PROPERTY SDK_APP_ELFS)
