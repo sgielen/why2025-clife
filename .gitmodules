@@ -1,0 +1,3 @@
+[submodule "sdk_apps/gameoflife_color/clife"]
+	path = sdk_apps/gameoflife_color/clife
+	url = github.com:sgielen/clife.git

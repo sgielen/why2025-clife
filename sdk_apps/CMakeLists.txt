@@ -15,6 +15,8 @@ set(APP_COMPILE_FLAGS
     -fno-builtin-function
     -fno-jump-tables
     -fno-tree-switch-conversion
+    -fno-exceptions
+    -fno-rtti
     -fstrict-volatile-bitfields
     -fvisibility=hidden
     -g3
@@ -233,6 +235,15 @@ build_app(why2025_ota
 build_app(badgevms_launcher
     SOURCES
      main.c
+)
+
+build_app(gameoflife_color
+    SOURCES
+     main.cpp
+    LIBRARIES
+     sdl3
+     # TODO: I'd like to link stdc++ but it doesn't seem to work?
+     #stdc++
 )
 
 #build_app(doomgeneric

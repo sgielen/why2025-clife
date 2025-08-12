@@ -1,0 +1,10 @@
+{
+    "unique_identifier": "gameoflife_color",
+    "name": "gameoflife_color",
+    "author": "Sjors Gielen",
+    "version": "1",
+    "interpreter": "",
+    "metadata_file": "",
+    "binary_path": "gameoflife_color.elf",
+    "source": 1
+}
